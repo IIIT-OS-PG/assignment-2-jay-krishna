@@ -223,38 +223,6 @@ void GroupRequestList(string groupname,string username){
 	cout<<"#####  #####"<<endl;
 }
 
-bool GroupAcceptRequest(string groupname,string username1,string username){
-	struct sockaddr_in remote_server;
-	int sock;
-	char output[MAX_SIZE];
-
-	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
-		perror("socket");
-		exit(-1);
-	}
-
-	remote_server.sin_family=AF_INET;
-	remote_server.sin_port=htons(sp);
-	remote_server.sin_addr.s_addr=inet_addr(si.c_str());
-	bzero(&remote_server.sin_zero,8);
-
-	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
-		perror("connect");
-		exit(-1);
-	}
-
-	string data="accept_request "+groupname+" "+username1+" "+username;
-	send(sock,data.c_str(),data.size(),0);
-	int len=recv(sock,output,MAX_SIZE,0);
-	output[len]='\0';
-	cout<<output<<endl;
-
-	if(output[0]=='0')
-		return false;
-	else
-		return true;
-}
-
 bool Logout(string username){
 
 	struct sockaddr_in remote_server;
@@ -389,22 +357,6 @@ int main(int argc, char** argv){
 			command_object>>command_split[1];
 
 			GroupRequestList(command_split[1],username);
-		}
-		else if(command_split[0]=="accept_request"){
-			if(!login_flag){
-				cout<<"Log in first"<<endl;
-				continue;
-			}
-
-			command_object>>command_split[1];
-			command_object>>command_split[2];
-			
-			if(GroupAcceptRequest(command_split[1],command_split[2],username)){
-				cout<<"Successful"<<endl;
-			}
-			else{
-				cout<<"Invalid Request"<<endl;
-			}			
 		}
 		else if(command_split[0]=="logout"){
 			if(!login_flag){

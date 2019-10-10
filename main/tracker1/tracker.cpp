@@ -24,8 +24,10 @@ using namespace std;
 unordered_map<string,string> credentials;
 unordered_map<string,pair<string,string> >online_users;
 set<string> online;
+set<string>group_members;
 unordered_map<string,string> groups;
 vector<pair<string,string>> tracker_info;
+set<pair<string,string> > pending_group_requests;
 
 struct Message{
 	int new_cli;
@@ -73,10 +75,32 @@ void DeleteLine(string filename,string data,int index){
 	infile.close();
 }
 
+void DeleteLine(string filename,string data){
+	string line;
+	ifstream infile(filename,ios::in);
+	cout<<"Whole line "<<data<<endl;
+	ofstream outfile(".temp.txt",ios::out|ios::app);
+
+	while(getline(infile,line)){
+			if(line==data)
+				continue;
+			else{
+				cout<<line<<endl;
+				outfile<<line<<endl;
+			}
+	}
+
+	remove(filename.c_str());
+	rename(".temp.txt",filename.c_str());
+	infile.close();
+}
+
 void FetchDetails(){
 	credentials.clear();
 	online.clear();
 	online_users.clear();
+	groups.clear();
+	pending_group_requests.clear();
 	string line,line1,line2;
 	
 	ifstream infile(".credential.txt",ios::in);
@@ -124,6 +148,62 @@ void FetchDetails(){
 		ofstream outfile(".group.txt",ios::out);
 		outfile.close();
 	}
+
+	infile.open(".pending.txt",ios::in);
+	if(infile){
+		while(getline(infile,line)){
+			stringstream line_object(line);
+			line_object>>line1;
+			line_object>>line2;
+
+			pending_group_requests.insert(make_pair(line1,line2));
+		}
+		infile.close();
+	}
+	else{
+		infile.close();
+		ofstream outfile(".pending.txt",ios::out);
+		outfile.close();
+	}
+}
+
+void FetchGroupMembers(string group_name){
+	string name=".group_"+group_name+".txt";
+	string line;
+	group_members.clear();
+	ifstream infile(name,ios::in);
+	// cout<<name<<endl;
+	while(getline(infile,line)){
+		// cout<<line<<endl;
+		group_members.insert(line);
+	}
+}
+
+void SendMessage(string ip,string port,string data){
+	struct sockaddr_in remote_server;
+	int sock;
+
+	cout<<ip<<endl;
+	cout<<port<<endl;
+	cout<<data<<endl;
+
+	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+		perror("socket");
+		exit(-1);
+	}
+
+	remote_server.sin_family=AF_INET;
+	remote_server.sin_port=htons(atoi(port.c_str()));
+	remote_server.sin_addr.s_addr=inet_addr(ip.c_str());
+	bzero(&remote_server.sin_zero,8);
+
+	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+		perror("connect");
+		exit(-1);
+	}
+
+	send(sock,data.c_str(),data.size(),0);
+	close(sock);
 }
 
 bool UserLogin(int new_cli,string command1,string command2,string command3,struct Message* message){
@@ -166,11 +246,16 @@ bool UserCreate(int new_cli,string command1,string command2,string command3,stru
 		outfile<<command3;
 		outfile<<endl;
 
-		outfile.open(".credential.txt",ios::app);
-		outfile<<command1;
-		outfile<<" ";
-		outfile<<command2;
-		outfile<<endl;
+		ofstream outfile2(".credential.txt",ios::out|ios::app);
+		if(outfile2){
+			cout<<"open"<<endl;
+		}
+		else
+			cout<<"Not open"<<endl;
+		outfile2<<command1;
+		outfile2<<" ";
+		outfile2<<command2;
+		outfile2<<endl;
 		outfile.close();
 
 		FetchDetails();
@@ -192,6 +277,12 @@ bool GroupCreate(int new_cli,string command1,string command2,struct Message* mes
 		ofstream outfile(".group.txt",ios::out|ios::app);
 		outfile<<command1;
 		outfile<<" ";
+		outfile<<command2;
+		outfile<<endl;
+		outfile.close();
+
+		string name=".group_"+command1+".txt";
+		outfile.open(name,ios::out);
 		outfile<<command2;
 		outfile<<endl;
 		outfile.close();
@@ -218,6 +309,90 @@ string GroupList(int new_cli,struct Message* message){
 	return data;
 }
 
+string GroupRequestList(int new_cli,struct Message* message,string command1,string command2){
+
+	FetchDetails();
+	string data="";
+
+	auto iter=groups.find(command1);
+
+	if(iter==groups.end() || command2!=iter->second)
+		return data;
+	else{
+		for(auto i:pending_group_requests){
+			// cout<<i.first<<" "<<i.second<<endl;
+			if(i.second==command1){
+				data=data+i.first+'\n';
+			}
+		}
+	}
+
+	return data;
+}
+
+bool GroupJoin(int new_cli,string command1,string command2,struct Message* message){
+	auto iter=groups.find(command1);
+
+	if(iter==groups.end())
+		return false;
+	// cout<<"Output "<<command1<<" "<<command2<<" "<<iter->first<<" "<<iter->second<<endl;
+	FetchGroupMembers(command1);
+	if(group_members.find(command2)!=group_members.end()){
+		cout<<"Already Memeber"<<endl;
+		return true;
+	}
+
+	auto iter2=online.find(iter->second);
+	if(iter2==online.end()){
+		if(pending_group_requests.find(make_pair(command2,command1))==pending_group_requests.end()){
+			ofstream outfile(".pending.txt",ios::out|ios::app);
+			outfile<<command2<<" "<<command1<<endl;
+			outfile.close();
+			pending_group_requests.insert(make_pair(command2,command1));
+		}
+	}
+	else{
+		auto iter3=online_users[*iter2];
+		cout<<iter3.first<<" "<<iter3.second<<endl;
+
+		ofstream outfile(".pending.txt",ios::out|ios::app);
+		outfile<<command2<<" "<<command1<<endl;
+		outfile.close();
+		pending_group_requests.insert(make_pair(command2,command1));
+
+		string data="join_group "+command1+" "+command2;
+		cout<<"2nd"<<endl;
+		// SendMessage(iter3.first,iter3.second,data);
+	}
+
+	return true;
+}
+
+bool GroupAcceptRequest(int new_cli,string command1,string command2,string command3,struct Message* message){
+	auto iter=groups.find(command1);
+	auto iter1=credentials.find(command2);
+	auto iter2=pending_group_requests.find(make_pair(command2,command1));
+	// cout<<"group accept"<<endl;
+
+	if(iter==groups.end() || iter->second != command3 || iter1==credentials.end() || iter2==pending_group_requests.end())
+		return false;
+
+	FetchGroupMembers(command1);
+	if(group_members.find(command2)!=group_members.end()){
+		cout<<"Already Memeber"<<endl;
+		return true;
+	}
+	string name=".group_"+command1+".txt";
+	string remove_line=command2+" "+command1;
+	// cout<<name<<endl;
+	ofstream outfile(name,ios::out|ios::app);
+	outfile<<command2<<endl;
+	outfile.close();
+	DeleteLine(".pending.txt",remove_line);
+
+	return true;
+}
+
 bool Logout(string command1){
 
 	FetchDetails();
@@ -239,10 +414,12 @@ bool Logout(string command1){
 void *TrackerKernel(void *pointer){
 	int data_len;
 	char data[MAX_SIZE+1];
+	memset(data,'\0', (MAX_SIZE+1)*sizeof(data[0]));
 	vector<string> command_split(10);
 	struct Message* message=(struct Message *)pointer;
 	// cout<<"yes"<<endl;
 	// cout<<message->new_cli<<endl;
+
 
 	data_len=recv(message->new_cli,data,MAX_SIZE,0);
 	data[data_len]='\0';
@@ -292,6 +469,35 @@ void *TrackerKernel(void *pointer){
 		string data=GroupList(message->new_cli,message);
 		send(message->new_cli,data.c_str(),data.size(),0);
 	}
+	else if(command_split[0]=="join_group"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+
+		// cout<<"server "<<command_split[1]<<" "<<command_split[2]<<endl;
+		if(GroupJoin(message->new_cli,command_split[1],command_split[2],message)){
+			send(message->new_cli,"1",1,0);
+		}
+		else
+			send(message->new_cli,"0",1,0);
+	}
+	else if(command_split[0]=="list_requests"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+
+		string data=GroupRequestList(message->new_cli,message,command_split[1],command_split[2]);
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
+	else if(command_split[0]=="accept_request"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+
+		if(GroupAcceptRequest(message->new_cli,command_split[1],command_split[2],command_split[3],message)){
+			send(message->new_cli,"1",1,0);
+		}
+		else
+			send(message->new_cli,"0",1,0);
+	}
 	else if(command_split[0]=="logout"){
 		command_object>>command_split[1];
 
@@ -304,6 +510,7 @@ void *TrackerKernel(void *pointer){
 	}
 	else{}
 
+	close(message->new_cli);
 	return NULL;
 }
 
@@ -367,6 +574,8 @@ void print_all(){
 // unordered_map<string,string> groups;
 // vector<pair<string,string>> tracker_info;
 
+	FetchDetails();
+
 	cout<<"##### credentials"<<endl;
 	for(auto i:credentials){
 		cout<<i.first<<" "<<i.second<<endl;
@@ -385,6 +594,11 @@ void print_all(){
 	}
 	cout<<"##### tracker_info"<<endl;
 	for(auto i:tracker_info){
+		cout<<i.first<<" "<<i.second<<endl;
+	}
+
+	cout<<"##### pending"<<endl;
+	for(auto i:pending_group_requests){
 		cout<<i.first<<" "<<i.second<<endl;
 	}
 }
