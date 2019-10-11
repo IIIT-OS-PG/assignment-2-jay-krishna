@@ -7,6 +7,26 @@ struct Message{
 	string client_port;
 };
 
+vector<string> split(string data,char delim){
+	vector<string> v;
+	string temp="";
+	for(long long unsigned int i=0;i<data.size();++i){
+		if(data[i]==delim){
+			v.push_back(temp);
+			temp="";
+		}
+		else{
+			// const char x=data[i];
+			// cout<<x<<endl;
+			temp.append(data,i,1);
+			// cout<<temp<<endl;
+		}
+	}
+	v.push_back(temp);
+
+	return v;
+}
+
 void* ClientServerKernel(void* pointer){
 	int data_len;
 	char data[MAX_SIZE+1];

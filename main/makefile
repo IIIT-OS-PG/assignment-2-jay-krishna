@@ -19,19 +19,19 @@ tracker: tracker1/tracker.cpp
 	g++ -pthread -Wall tracker1/tracker.cpp -o tracker1/tracker
 
 peer1: peer1/peer1.o peer1/peerserver1.o
-	g++ -pthread -Wall peer1/peer1.o peer1/peerserver1.o -o peer1/peer1
+	g++ -pthread -Wall peer1/peer1.o peer1/peerserver1.o -o peer1/peer1 -lssl -lcrypto
 
 peer1/peer1.o: peer1/peer.cpp
-	g++ -pthread -Wall -c -o peer1/peer1.o peer1/peer.cpp
+	g++ -pthread -Wall -c -o peer1/peer1.o peer1/peer.cpp -lssl -lcrypto
 
 peer1/peerserver1.o: peer1/peerserver.cpp 
-	g++ -pthread -Wall -c -o peer1/peerserver1.o peer1/peerserver.cpp
+	g++ -pthread -Wall -c -o peer1/peerserver1.o peer1/peerserver.cpp -lssl -lcrypto
 
 peer2: peer2/peer2.o peer2/peerserver2.o
-	g++ -pthread -Wall peer2/peer2.o peer2/peerserver2.o -o peer2/peer2
+	g++ -pthread -Wall peer2/peer2.o peer2/peerserver2.o -o peer2/peer2 -lssl -lcrypto
 
 peer2/peer2.o: peer2/peer.cpp
-	g++ -pthread -Wall -c -o peer2/peer2.o peer2/peer.cpp
+	g++ -pthread -Wall -c -o peer2/peer2.o peer2/peer.cpp -lssl -lcrypto
 
 peer2/peerserver2.o: peer2/peerserver.cpp 
-	g++ -pthread -Wall -c -o peer2/peerserver2.o peer2/peerserver.cpp
+	g++ -pthread -Wall -c -o peer2/peerserver2.o peer2/peerserver.cpp -lssl -lcrypto

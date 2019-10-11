@@ -28,5 +28,6 @@ using namespace std;
 
 void* ClientServer(void* pointer);
 void* ClientServerKernel(void* pointer);
+vector<string> split(string data,char delim);
 
 #endif

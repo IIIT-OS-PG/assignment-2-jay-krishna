@@ -16,7 +16,11 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <stdio.h>
+#include <stdlib.h>
+#include <utility>
 
+#include <openssl/sha.h>
 #include "peerserver.h"
 
 using namespace std;
@@ -223,6 +227,109 @@ void GroupRequestList(string groupname,string username){
 	cout<<"#####  #####"<<endl;
 }
 
+bool GroupAcceptRequest(string groupname,string username1,string username){
+	struct sockaddr_in remote_server;
+	int sock;
+	char output[MAX_SIZE];
+
+	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+		perror("socket");
+		exit(-1);
+	}
+
+	remote_server.sin_family=AF_INET;
+	remote_server.sin_port=htons(sp);
+	remote_server.sin_addr.s_addr=inet_addr(si.c_str());
+	bzero(&remote_server.sin_zero,8);
+
+	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+		perror("connect");
+		exit(-1);
+	}
+
+	string data="accept_request "+groupname+" "+username1+" "+username;
+	send(sock,data.c_str(),data.size(),0);
+	int len=recv(sock,output,MAX_SIZE,0);
+	output[len]='\0';
+	cout<<output<<endl;
+
+	if(output[0]=='0')
+		return false;
+	else
+		return true;
+}
+
+pair<string,long long int> GetFileHash(string filename){
+	int max_limit=1024;
+	
+	unsigned char result[2*SHA_DIGEST_LENGTH];
+	unsigned char hash[SHA_DIGEST_LENGTH];
+
+	FILE *f = fopen(filename.c_str(),"rb");
+
+	if(f==NULL){
+		return make_pair("",0);
+	}
+
+	SHA_CTX mdContent;
+	unsigned char data[max_limit+1];
+	int bytes;
+	long long int file_size=0;
+	string final_hash="";
+
+	while((bytes=fread(data, 1, max_limit, f))){
+		data[bytes]='\0';
+		file_size+=bytes;
+
+		SHA1_Init(&mdContent);
+
+		SHA1_Update(&mdContent, data, bytes);
+		SHA1_Final(hash,&mdContent);
+		for(int i=0; i < SHA_DIGEST_LENGTH;i++){
+		  sprintf((char *)&(result[i*2]), "%02x",hash[i]);
+		}
+		// printf("%s\n",result);
+		// cout<<bytes<<endl;
+		string temp_hash(result,result+20);
+
+		final_hash=final_hash+temp_hash;
+	}
+
+	return make_pair(final_hash,file_size);
+}
+
+bool FileUpload(pair<string,long long int> file_metadata,string groupname,string username,string filename){
+	struct sockaddr_in remote_server;
+	int sock;
+	char output[MAX_SIZE];
+
+	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+		perror("socket");
+		exit(-1);
+	}
+
+	remote_server.sin_family=AF_INET;
+	remote_server.sin_port=htons(sp);
+	remote_server.sin_addr.s_addr=inet_addr(si.c_str());
+	bzero(&remote_server.sin_zero,8);
+
+	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+		perror("connect");
+		exit(-1);
+	}
+
+	string data="upload_file "+file_metadata.first+" "+to_string(file_metadata.second)+" "+groupname+" "+username+" "+filename;
+	send(sock,data.c_str(),data.size(),0);
+	int len=recv(sock,output,MAX_SIZE,0);
+	output[len]='\0';
+	cout<<output<<endl;
+
+	if(output[0]=='0')
+		return false;
+	else
+		return true;
+}
+
 bool Logout(string username){
 
 	struct sockaddr_in remote_server;
@@ -357,6 +464,49 @@ int main(int argc, char** argv){
 			command_object>>command_split[1];
 
 			GroupRequestList(command_split[1],username);
+		}
+		else if(command_split[0]=="accept_request"){
+			if(!login_flag){
+				cout<<"Log in first"<<endl;
+				continue;
+			}
+
+			command_object>>command_split[1];
+			command_object>>command_split[2];
+			
+			if(GroupAcceptRequest(command_split[1],command_split[2],username)){
+				cout<<"Successful"<<endl;
+			}
+			else{
+				cout<<"Invalid Request"<<endl;
+			}			
+		}
+		else if(command_split[0]=="upload_file"){
+			if(!login_flag){
+				cout<<"Log in first"<<endl;
+				continue;
+			}
+
+			command_object>>command_split[1];
+			command_object>>command_split[2];
+
+			auto file_metadata=GetFileHash(command_split[1]);
+
+			if(file_metadata.first.size()==0){
+				cout<<"Cannot open file"<<endl;
+				continue;
+			}
+
+			auto names=split(command_split[1],'/');
+			string name=names[names.size()-1];
+
+			if(FileUpload(file_metadata,command_split[2],username,name)){
+				cout<<"Successful"<<endl;
+			}
+			else{
+				cout<<"Invalid Request"<<endl;
+			}
+			
 		}
 		else if(command_split[0]=="logout"){
 			if(!login_flag){

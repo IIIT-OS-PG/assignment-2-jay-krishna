@@ -73,12 +73,13 @@ void DeleteLine(string filename,string data,int index){
 	remove(filename.c_str());
 	rename(".temp.txt",filename.c_str());
 	infile.close();
+	outfile.close();
 }
 
 void DeleteLine(string filename,string data){
 	string line;
 	ifstream infile(filename,ios::in);
-	cout<<"Whole line "<<data<<endl;
+	// cout<<"Whole line "<<data<<endl;
 	ofstream outfile(".temp.txt",ios::out|ios::app);
 
 	while(getline(infile,line)){
@@ -93,6 +94,52 @@ void DeleteLine(string filename,string data){
 	remove(filename.c_str());
 	rename(".temp.txt",filename.c_str());
 	infile.close();
+}
+
+bool CheckGroupFiles(string filehash,string filename,string username){
+	ifstream infile(filename,ios::in);
+	string line;
+
+	while(getline(infile,line)){
+		auto file_vector=split(line,' ');
+		if(file_vector[0]==filehash && file_vector[2]==username){
+			cout<<filehash<<" "<<username<<endl;
+			cout<<file_vector[0]<<" "<<file_vector[2]<<endl;
+			return true;
+		}
+	}
+	return false;
+}
+
+string GetGroupFileName(string filehash,string filename){
+	ifstream infile(filename,ios::in);
+	string line;
+	string name="";
+
+	while(getline(infile,line)){
+		auto file_vector=split(line,' ');
+		if(file_vector[0]==filehash){
+			name=file_vector[3];
+			break;
+		}
+	}
+
+	return name;
+}
+
+bool CheckIntegrity(string filehash,string filename,string upload_file){
+	ifstream infile(filename,ios::in);
+	string line;
+
+	while(getline(infile,line)){
+		auto file_vector=split(line,' ');
+		cout<<line<<endl;
+		if(file_vector[0]!=filehash && file_vector[3]==upload_file){
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void FetchDetails(){
@@ -287,6 +334,10 @@ bool GroupCreate(int new_cli,string command1,string command2,struct Message* mes
 		outfile<<endl;
 		outfile.close();
 
+		name=".group_"+command1+"_files.txt";
+		outfile.open(name,ios::out);
+		outfile.close();
+
 		FetchDetails();
 
 		return true;
@@ -324,6 +375,36 @@ string GroupRequestList(int new_cli,struct Message* message,string command1,stri
 			if(i.second==command1){
 				data=data+i.first+'\n';
 			}
+		}
+	}
+
+	return data;
+}
+
+string GroupFileList(int new_cli,struct Message* message,string command1){
+
+	FetchDetails();
+	string data="";
+
+	auto iter=groups.find(command1);
+
+	if(iter==groups.end())
+		return data;
+	else{
+
+		set<string> files;
+		string name=".group_"+command1+"_files.txt";
+		string line;
+
+		ifstream infile(name,ios::in);
+
+		while(getline(infile,line)){
+			auto split_vector=split(line,' ');
+			files.insert(split_vector[3]);
+		}
+
+		for(auto i:files){
+			data=data+i+'\n';
 		}
 	}
 
@@ -389,6 +470,66 @@ bool GroupAcceptRequest(int new_cli,string command1,string command2,string comma
 	outfile<<command2<<endl;
 	outfile.close();
 	DeleteLine(".pending.txt",remove_line);
+
+	return true;
+}
+
+bool GroupFileUpload(int new_cli,string command1,string command2,string command3,string command4,string command5,struct Message* message){
+	auto iter=groups.find(command3);
+	if(iter==groups.end())
+		return false;
+	
+	FetchGroupMembers(command3);
+	if(group_members.find(command4)==group_members.end())
+		return false;
+	string name=".group_"+command3+"_files.txt";
+
+	if(CheckGroupFiles(command1,name,command4))
+		return true;
+
+	string file_name=GetGroupFileName(command1,name);
+	if(file_name.size()>0)
+		command5=file_name;
+
+	if(CheckIntegrity(command1,name,command5))
+		return false;
+
+	ofstream outfile(name,ios::out|ios::app);
+	outfile<<command1<<" "<<command2<<" "<<command4<<" "<<command5<<endl;
+
+	return true;
+}
+
+bool GroupStopShare(int new_cli,string command1,string command2,string command3,struct Message* message){
+	auto iter=groups.find(command2);
+	auto iter1=credentials.find(command3);
+
+	cout<<"Lines1"<<endl;
+	cout<<command1<<" "<<command2<<" "<<command3<<endl;
+	if(iter==groups.end() || iter1==credentials.end())
+		return false;
+	cout<<"Lines2"<<endl;
+	FetchGroupMembers(command2);
+	if(group_members.find(command3)==group_members.end()){
+		return false;
+	}
+	string name=".group_"+command2+"_files.txt";
+	ifstream infile(name,ios::in);
+	ofstream outfile(".temp.txt",ios::out);
+	string line;
+	cout<<"Lines3"<<endl;
+
+	while(getline(infile,line)){
+		auto split_vector=split(line,' ');
+		if(split_vector[3]==command1 && split_vector[2]==command3)
+			continue;
+		outfile<<line<<endl;
+	}
+
+	remove(name.c_str());
+	rename(".temp.txt",name.c_str());
+	infile.close();
+	outfile.close();
 
 	return true;
 }
@@ -493,6 +634,36 @@ void *TrackerKernel(void *pointer){
 		command_object>>command_split[3];
 
 		if(GroupAcceptRequest(message->new_cli,command_split[1],command_split[2],command_split[3],message)){
+			send(message->new_cli,"1",1,0);
+		}
+		else
+			send(message->new_cli,"0",1,0);
+	}
+	else if(command_split[0]=="upload_file"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+		command_object>>command_split[4];
+		command_object>>command_split[5];
+
+		if(GroupFileUpload(message->new_cli,command_split[1],command_split[2],command_split[3],command_split[4],command_split[5],message)){
+			send(message->new_cli,"1",1,0);
+		}
+		else
+			send(message->new_cli,"0",1,0);
+	}
+	else if(command_split[0]=="list_files"){
+		command_object>>command_split[1];
+
+		string data=GroupFileList(message->new_cli,message,command_split[1]);
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
+	else if(command_split[0]=="stop_share"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+
+		if(GroupStopShare(message->new_cli,command_split[1],command_split[2],command_split[3],message)){
 			send(message->new_cli,"1",1,0);
 		}
 		else
