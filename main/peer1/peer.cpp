@@ -28,9 +28,48 @@ using namespace std;
 #define MAX_SIZE 1024
 
 string username;
+string myip;
 
-string si="127.0.0.1";
-int sp=10000;
+string si="";//="127.0.0.1";
+int sp=0;//=10001;
+
+bool CheckTracker(string filepath){
+	ifstream infile(filepath,ios::in);
+	string line;
+
+	struct sockaddr_in remote_server;
+	int sock;
+	bool flag=false;
+
+	while(getline(infile,line)){
+		auto split_vector=split(line,' ');
+		// cout<<split_vector[0]<<endl;
+		// cout<<split_vector[1]<<endl;
+
+		if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+			perror("socket");
+			// exit(-1);
+		}
+
+		remote_server.sin_family=AF_INET;
+		remote_server.sin_port=htons(atoi(split_vector[1].c_str()));
+		remote_server.sin_addr.s_addr=inet_addr(split_vector[0].c_str());
+		bzero(&remote_server.sin_zero,8);
+
+		if(!((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1)){
+			// perror("connect");
+			// exit(-1);
+			flag=true;
+			si=split_vector[0];
+			sp=atoi(split_vector[1].c_str());
+
+			close(sock);
+		}
+	}
+
+	cout<<"Connected to "<<sp<<endl;
+	return flag;
+}
 
 bool UserLogin(string username,string password,int myport_i){
 	struct sockaddr_in remote_server;
@@ -52,7 +91,7 @@ bool UserLogin(string username,string password,int myport_i){
 		exit(-1);
 	}
 
-	string data="login "+username+" "+password+" "+to_string(myport_i);
+	string data="login "+username+" "+password+" "+to_string(myport_i)+" "+myip;
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
@@ -84,11 +123,13 @@ bool UserCreate(string username,string password,int myport_i){
 		exit(-1);
 	}
 
-	string data="create_user "+username+" "+password+" "+to_string(myport_i);
+	string data="create_user "+username+" "+password+" "+to_string(myport_i)+" "+myip;
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
 	cout<<output<<endl;
+
+	close(sock);
 
 	if(output[0]=='0')
 		return false;
@@ -124,6 +165,8 @@ bool GroupCreate(string groupname, string username){
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
 	cout<<output<<endl;
+
+	close(sock);
 
 	if(output[0]=='0')
 		return false;
@@ -162,6 +205,8 @@ void GroupList(){
 	cout<<output<<endl;
 
 	cout<<"#####  #####"<<endl;
+
+	close(sock);
 }
 
 bool GroupJoin(string groupname,string username){
@@ -189,6 +234,8 @@ bool GroupJoin(string groupname,string username){
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
 	cout<<output<<endl;
+
+	close(sock);
 
 	if(output[0]=='0')
 		return false;
@@ -225,6 +272,8 @@ void GroupRequestList(string groupname,string username){
 	cout<<output<<endl;
 
 	cout<<"#####  #####"<<endl;
+
+	close(sock);
 }
 
 void GroupRequestFiles(string groupname){
@@ -256,6 +305,8 @@ void GroupRequestFiles(string groupname){
 	cout<<output<<endl;
 
 	cout<<"#####  #####"<<endl;
+
+	close(sock);
 }
 
 bool GroupAcceptRequest(string groupname,string username1,string username){
@@ -284,6 +335,8 @@ bool GroupAcceptRequest(string groupname,string username1,string username){
 	output[len]='\0';
 	cout<<output<<endl;
 
+	close(sock);
+
 	if(output[0]=='0')
 		return false;
 	else
@@ -291,7 +344,7 @@ bool GroupAcceptRequest(string groupname,string username1,string username){
 }
 
 pair<string,long long int> GetFileHash(string filename){
-	int max_limit=1024;
+	int max_limit=2*512*1024;
 	
 	unsigned char result[2*SHA_DIGEST_LENGTH];
 	unsigned char hash[SHA_DIGEST_LENGTH];
@@ -329,7 +382,7 @@ pair<string,long long int> GetFileHash(string filename){
 	return make_pair(final_hash,file_size);
 }
 
-bool FileUpload(pair<string,long long int> file_metadata,string groupname,string username,string filename){
+bool FileUpload(pair<string,long long int> file_metadata,string groupname,string username,string filename,string path){
 	struct sockaddr_in remote_server;
 	int sock;
 	char output[MAX_SIZE];
@@ -349,11 +402,16 @@ bool FileUpload(pair<string,long long int> file_metadata,string groupname,string
 		exit(-1);
 	}
 
-	string data="upload_file "+file_metadata.first+" "+to_string(file_metadata.second)+" "+groupname+" "+username+" "+filename;
+	string data="upload_file "+file_metadata.first+" "+to_string(file_metadata.second)+" "+groupname+" "+username+" "+filename+" "+path;
+
+	cout<<data<<" "<<data.size()<<endl;
+
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
 	cout<<output<<endl;
+
+	close(sock);
 
 	if(output[0]=='0')
 		return false;
@@ -386,6 +444,42 @@ bool GroupStopShare(string groupname,string filename,string username){
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
 	cout<<output<<endl;
+
+	close(sock);
+
+	if(output[0]=='0')
+		return false;
+	else
+		return true;
+}
+
+bool GroupLeave(string groupname,string username){
+	struct sockaddr_in remote_server;
+	int sock;
+	char output[MAX_SIZE];
+
+	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+		perror("socket");
+		exit(-1);
+	}
+
+	remote_server.sin_family=AF_INET;
+	remote_server.sin_port=htons(sp);
+	remote_server.sin_addr.s_addr=inet_addr(si.c_str());
+	bzero(&remote_server.sin_zero,8);
+
+	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+		perror("connect");
+		exit(-1);
+	}
+
+	string data="leave_group "+groupname+" "+username;
+	send(sock,data.c_str(),data.size(),0);
+	int len=recv(sock,output,MAX_SIZE,0);
+	output[len]='\0';
+	cout<<output<<endl;
+
+	close(sock);
 
 	if(output[0]=='0')
 		return false;
@@ -420,6 +514,8 @@ bool Logout(string username){
 	output[len]='\0';
 	cout<<output<<endl;
 
+	close(sock);
+
 	if(output[0]=='0')
 		return false;
 	else
@@ -434,9 +530,10 @@ int main(int argc, char** argv){
 	pthread_t tid;
 	vector<string> command_split(10);
 
-	string myport=argv[1];
+	myip=argv[1];
+	string myport=argv[2];
 	int myport_i=atoi(myport.c_str());
-	string filepath=argv[2];
+	string filepath=argv[3];
 
 	auto pid=pthread_create(&tid,NULL,ClientServer,&myport_i);
 
@@ -450,6 +547,14 @@ int main(int argc, char** argv){
 		getline(cin,command);
 		stringstream command_object(command);
 		command_object>>command_split[0];
+
+		if(command_split[0]=="quit")
+			break;
+
+		if(!CheckTracker(filepath)){
+			cout<<"No tracker online"<<endl;
+			continue;
+		}
 
 		if(command_split[0]=="login"){
 			if(login_flag){
@@ -563,7 +668,7 @@ int main(int argc, char** argv){
 			auto names=split(command_split[1],'/');
 			string name=names[names.size()-1];
 
-			if(FileUpload(file_metadata,command_split[2],username,name)){
+			if(FileUpload(file_metadata,command_split[2],username,name,command_split[1])){
 				cout<<"Successful"<<endl;
 			}
 			else{
@@ -596,6 +701,20 @@ int main(int argc, char** argv){
 				cout<<"Invalid Request"<<endl;
 			}			
 		}
+		else if(command_split[0]=="leave_group"){
+			if(!login_flag){
+				cout<<"Log in first"<<endl;
+				continue;
+			}
+
+			command_object>>command_split[1];
+			if(GroupLeave(command_split[1],username)){
+				cout<<"Successful"<<endl;
+			}
+			else{
+				cout<<"Invalid Request"<<endl;
+			}	
+		}
 		else if(command_split[0]=="logout"){
 			if(!login_flag){
 				cout<<"Log in first"<<endl;
@@ -617,6 +736,7 @@ int main(int argc, char** argv){
 			}
 			cout<<"Out"<<endl;
 		}
+		// cout<<"End"<<endl;
 	}
 
 	return 0;

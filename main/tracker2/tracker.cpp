@@ -538,18 +538,22 @@ bool GroupFileUpload(int new_cli,string command1,string command2,string command3
 }
 
 bool GroupStopShare(int new_cli,string command1,string command2,string command3,struct Message* message){
-	auto iter=groups.find(command1);
+	auto iter=groups.find(command2);
 	auto iter1=credentials.find(command3);
+
+	cout<<command1<<" "<<command2<<" "<<command3<<endl;
 
 	if(iter==groups.end() || iter1==credentials.end())
 		return false;
 
-	FetchGroupMembers(command1);
+	cout<<command1<<" "<<command2<<" "<<command3<<endl;
+	FetchGroupMembers(command2);
 	if(group_members.find(command3)==group_members.end()){
 		return false;
 	}
+	cout<<command1<<" "<<command2<<" "<<command3<<endl;
 
-	string name=".group_"+command1+"_files.txt";
+	string name=".group_"+command2+"_files.txt";
 	string name1=".files_"+command3+".txt";
 
 	ifstream infile(name,ios::in);
@@ -558,7 +562,7 @@ bool GroupStopShare(int new_cli,string command1,string command2,string command3,
 
 	while(getline(infile,line)){
 		auto split_vector=split(line,' ');
-		if(split_vector[3]==command2 && split_vector[2]==command3)
+		if(split_vector[3]==command1 && split_vector[2]==command3)
 			continue;
 		outfile<<line<<endl;
 	}
@@ -568,7 +572,7 @@ bool GroupStopShare(int new_cli,string command1,string command2,string command3,
 	infile.close();
 	outfile.close();
 
-	DeleteLine(name1,command2,1);
+	DeleteLine(name1,command1,1);
 
 	Sync(name,mysequence_i,tracker_info);
 	Sync(name1,mysequence_i,tracker_info);
@@ -630,7 +634,7 @@ void *TrackerKernel(void *pointer){
 	vector<string> command_split(10);
 	struct Message* message=(struct Message *)pointer;
 	// cout<<"yes"<<endl;
-	cout<<message->new_cli<<endl;
+	// cout<<message->new_cli<<endl;
 
 
 	data_len=recv(message->new_cli,data,MAX_SIZE,0);

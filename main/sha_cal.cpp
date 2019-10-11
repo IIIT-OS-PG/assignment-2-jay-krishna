@@ -46,41 +46,20 @@ void getFileHash(){
 }
 
 
-void getsha(char *res){
-
-		   FILE *f = fopen("/home/singular/Downloads/final_5d66d1dd7c3b280014ca9936_688500.mp4","rb");
-		   char buffer[14];
-		   fread(buffer,1,14,f);
-
-		unsigned char SHA_Buffer[SHA_DIGEST_LENGTH];
-		char buf[SHA_DIGEST_LENGTH*2];
-		int i;
-		
-		SHA1((unsigned char *)buffer, 14, SHA_Buffer);
-		
-		for (i=0; i < SHA_DIGEST_LENGTH; i++) {
-			sprintf((char*)&(buf[i*2]), "%02x", SHA_Buffer[i]);
-		}
-		for(int i=0;i<SHA_DIGEST_LENGTH*2;i++){
-				res[i]=buf[i];
-			}
-	// res[i]='\0';
-}
-
-void getFileHash2(){
+void getFileHash2(string filename){
 
    int max_limit=1024;
    unsigned char result[2*SHA_DIGEST_LENGTH];
    unsigned char hash[SHA_DIGEST_LENGTH];
    int i;
-   FILE *f = fopen("/home/singular/Downloads/final_5d66d1dd7c3b280014ca9936_688500.mp4","rb");
+   FILE *f = fopen(filename.c_str(),"rb");
    SHA_CTX mdContent;
-   unsigned char data[10*1024+1];
+   unsigned char data[1024+1];
    int bytes;
    // int bytes=fread(data, 1, 1024, f);
    // data[bytes]='\0';
    int count=0;
-   while(bytes=fread(data, 1, 10*1024, f)){
+   while(bytes=fread(data, 1, 1024, f)){
       data[bytes]='\0';
 
       SHA1_Init(&mdContent);
@@ -118,6 +97,6 @@ int main () {
    // }
    // cout << s;
    // cout << endl;
-   getFileHash2();
+   getFileHash2("data.txt");
    return 0;
 }
