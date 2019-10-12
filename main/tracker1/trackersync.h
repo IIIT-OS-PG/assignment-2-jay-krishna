@@ -17,6 +17,7 @@
 #include <vector>
 #include <set>
 #include <pthread.h>
+#include <dirent.h>
 
 using namespace std;
 
@@ -30,5 +31,7 @@ void Sync(string filename,int mysequence_i,vector<pair<string,string>> tracker_i
 bool IsOnline(int target_seq,vector<pair<string,string>> tracker_info);
 int GetTracker2(int mysequence_i);
 void SyncRecv(int new_cli,string filename);
+void SyncAll(int mysequence_i,vector<pair<string,string>> tracker_info);
+void SyncAllHandler(int mysequence_i,vector<pair<string,string>> tracker_info);
 
 #endif

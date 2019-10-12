@@ -1,3 +1,0 @@
-g1 abc
-g2 abc
-g3 jay
