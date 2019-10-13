@@ -1,5 +1,19 @@
 #include "trackersync.h"
 
+// pair<string,string> OtherServerDetails(int mysequence_i){
+// 	int target_seq;
+// 	if(mysequence_i==0){
+// 		target_seq=1;
+// 	}
+// 	else
+// 		target_seq=0;
+
+
+
+
+
+// }
+
 int GetTracker2(int mysequence_i){
 	if(mysequence_i)
 		return 0;
@@ -117,10 +131,13 @@ void SyncAllHandler(int mysequence_i,vector<pair<string,string>> tracker_info){
 		while((entry=readdir(dp))){
 			// cout<<entry->d_name<<endl;
 			string filename(entry->d_name);
-			filename=path+"/"+filename;
+
+			cout<<"filename is "<<filename<<endl;
 
 			if(filename=="." || filename=="..")
 				continue;
+
+			filename=path+"/"+filename;
 
 			Sync(filename,mysequence_i,tracker_info);
 		}

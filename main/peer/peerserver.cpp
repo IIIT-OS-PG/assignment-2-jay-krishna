@@ -27,6 +27,12 @@ vector<string> split(string data,char delim){
 	return v;
 }
 
+string Respond(){
+	string data="Hey";
+
+	return data;
+}
+
 void* ClientServerKernel(void* pointer){
 	int data_len;
 	char data[MAX_SIZE+1];
@@ -48,7 +54,18 @@ void* ClientServerKernel(void* pointer){
 		cout<<command_split[1]<<endl;
 		cout<<command_split[2]<<endl;
 	}
+	else if(command_split[0]=="Hello"){
+		command_object>>command_split[1];
+		// command_object>>command_split[2];
 
+		cout<<command_split[1]<<endl;
+		string data=Respond();
+
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
+	else{}
+
+	close(message->new_cli);
 	return NULL;
 }
 

@@ -23,11 +23,11 @@ using namespace std;
 
 // string username;
 
-#ifndef __peerserver_H_INCLUDED__
-#define __peerserver_H_INCLUDED__
+#ifndef __peerdownload_H_INCLUDED__
+#define __peerdownload_H_INCLUDED__
 
-void* ClientServer(void* pointer);
-void* ClientServerKernel(void* pointer);
-vector<string> split(string data,char delim);
+void DownloadFile(string groupname, string filename, string filepath,string username,string myip,string si,int sp);
+vector<string> split2(string data,char delim);
+void GetChunks(struct FILEDATA* filemeta);
 
 #endif

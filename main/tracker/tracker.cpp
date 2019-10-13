@@ -33,6 +33,9 @@ unordered_map<string,string> groups;
 vector<pair<string,string>> tracker_info;
 set<pair<string,string> > pending_group_requests;
 
+pthread_mutex_t file_lock;
+pthread_mutex_t global_lock;
+
 struct Message{
 	int new_cli;
 	struct sockaddr_in client;
@@ -64,8 +67,11 @@ vector<string> split(string data,char delim){
 
 void DeleteLine(string filename,string data,int index){
 	string line;
+
+	pthread_mutex_lock(&file_lock);
+
 	ifstream infile(filename,ios::in);
-	ofstream outfile("all_files/.temp.txt",ios::out|ios::app);
+	ofstream outfile(".all_files/.temp.txt",ios::out|ios::app);
 
 	while(getline(infile,line)){
 			vector<string> v=split(line,' ');
@@ -77,16 +83,20 @@ void DeleteLine(string filename,string data,int index){
 	}
 
 	remove(filename.c_str());
-	rename("all_files/.temp.txt",filename.c_str());
+	rename(".all_files/.temp.txt",filename.c_str());
 	infile.close();
 	outfile.close();
+
+	pthread_mutex_unlock(&file_lock);
 }
 
 void DeleteLine(string filename,string data){
 	string line;
+	pthread_mutex_lock(&file_lock);
+
 	ifstream infile(filename,ios::in);
 	// cout<<"Whole line "<<data<<endl;
-	ofstream outfile("all_files/.temp.txt",ios::out|ios::app);
+	ofstream outfile(".all_files/.temp.txt",ios::out|ios::app);
 
 	while(getline(infile,line)){
 			if(line==data)
@@ -98,26 +108,33 @@ void DeleteLine(string filename,string data){
 	}
 
 	remove(filename.c_str());
-	rename("all_files/.temp.txt",filename.c_str());
+	rename(".all_files/.temp.txt",filename.c_str());
 	infile.close();
+
+	pthread_mutex_unlock(&file_lock);
 }
 
 bool CheckGroupFiles(string filehash,string filename,string username){
 	ifstream infile(filename,ios::in);
 	string line;
 
+	pthread_mutex_lock(&file_lock);
+
 	while(getline(infile,line)){
 		auto file_vector=split(line,' ');
 		if(file_vector[0]==filehash && file_vector[2]==username){
 			cout<<filehash<<" "<<username<<endl;
 			cout<<file_vector[0]<<" "<<file_vector[2]<<endl;
+			pthread_mutex_unlock(&file_lock);
 			return true;
 		}
 	}
+	pthread_mutex_unlock(&file_lock);
 	return false;
 }
 
 string GetGroupFileName(string filehash,string filename){
+	pthread_mutex_lock(&file_lock);
 	ifstream infile(filename,ios::in);
 	string line;
 	string name="";
@@ -130,10 +147,13 @@ string GetGroupFileName(string filehash,string filename){
 		}
 	}
 
+	pthread_mutex_unlock(&file_lock);
+
 	return name;
 }
 
 bool CheckIntegrity(string filehash,string filename,string upload_file){
+	pthread_mutex_lock(&file_lock);
 	ifstream infile(filename,ios::in);
 	string line;
 
@@ -141,15 +161,16 @@ bool CheckIntegrity(string filehash,string filename,string upload_file){
 		auto file_vector=split(line,' ');
 		cout<<line<<endl;
 		if(file_vector[0]!=filehash && file_vector[3]==upload_file){
+			pthread_mutex_unlock(&file_lock);
 			return true;
 		}
 	}
-
+	pthread_mutex_unlock(&file_lock);
 	return false;
 }
 
 void CheckDir(){
-	string s="all_files";
+	string s=".all_files";
 
 	// struct dirent *entry=NULL;
 	DIR *dp=NULL;
@@ -183,7 +204,8 @@ void FetchDetails(){
 
 	CheckDir();
 	
-	ifstream infile("all_files/.credential.txt",ios::in);
+	pthread_mutex_lock(&file_lock);
+	ifstream infile(".all_files/.credential.txt",ios::in);
 	if(infile){
 		while(getline(infile,line)){
 			stringstream line_object(line);
@@ -196,11 +218,11 @@ void FetchDetails(){
 	}
 	else{
 		infile.close();
-		ofstream outfile("all_files/.credential.txt",ios::out);
+		ofstream outfile(".all_files/.credential.txt",ios::out);
 		outfile.close();
 	}
 
-	infile.open("all_files/.online.txt",ios::in);
+	infile.open(".all_files/.online.txt",ios::in);
 	if(infile){
 		while(getline(infile,line)){
 			vector<string> split_vector=split(line,' ');
@@ -211,11 +233,11 @@ void FetchDetails(){
 	}
 	else{
 		infile.close();
-		ofstream outfile("all_files/.online.txt",ios::out);
+		ofstream outfile(".all_files/.online.txt",ios::out);
 		outfile.close();
 	}
 
-	infile.open("all_files/.group.txt",ios::in);
+	infile.open(".all_files/.group.txt",ios::in);
 	if(infile){
 		while(getline(infile,line)){
 			vector<string> split_vector=split(line,' ');
@@ -225,11 +247,11 @@ void FetchDetails(){
 	}
 	else{
 		infile.close();
-		ofstream outfile("all_files/.group.txt",ios::out);
+		ofstream outfile(".all_files/.group.txt",ios::out);
 		outfile.close();
 	}
 
-	infile.open("all_files/.pending.txt",ios::in);
+	infile.open(".all_files/.pending.txt",ios::in);
 	if(infile){
 		while(getline(infile,line)){
 			stringstream line_object(line);
@@ -242,13 +264,15 @@ void FetchDetails(){
 	}
 	else{
 		infile.close();
-		ofstream outfile("all_files/.pending.txt",ios::out);
+		ofstream outfile(".all_files/.pending.txt",ios::out);
 		outfile.close();
 	}
+	pthread_mutex_unlock(&file_lock);
 }
 
 void FetchGroupMembers(string group_name){
-	string name="all_files/.group_"+group_name+".txt";
+	pthread_mutex_lock(&file_lock);
+	string name=".all_files/.group_"+group_name+".txt";
 	string line;
 	group_members.clear();
 	ifstream infile(name,ios::in);
@@ -257,6 +281,7 @@ void FetchGroupMembers(string group_name){
 		// cout<<line<<endl;
 		group_members.insert(line);
 	}
+	pthread_mutex_unlock(&file_lock);
 }
 
 void SendMessage(string ip,string port,string data){
@@ -299,19 +324,25 @@ bool UserLogin(int new_cli,string command1,string command2,string command3,strin
 			if(online.find(command1)==online.end()){
 				online.insert(command1);
 
-				ofstream outfile("all_files/.online.txt",ios::out|ios::app);
+				pthread_mutex_lock(&file_lock);
+
+				ofstream outfile(".all_files/.online.txt",ios::out|ios::app);
 				outfile<<command1<<" ";
 				outfile<<command4<<" ";
 				outfile<<command3;
 				outfile<<endl;
 
-				Sync("all_files/.online.txt",mysequence_i,tracker_info);
+				pthread_mutex_unlock(&file_lock);
+
+				Sync(".all_files/.online.txt",mysequence_i,tracker_info);
 			}
 			return true;
 
 		}
-		else
+		else{
+			// pthread_mutex_unlock(&file_lock);
 			return false;
+		}
 	}
 }
 
@@ -321,14 +352,15 @@ bool UserCreate(int new_cli,string command1,string command2,string command3,stri
 
 	if(credentials.find(command1)==credentials.end()){
 		// online.insert(command1,make_pair(to_string()));
+		pthread_mutex_lock(&file_lock);
 		online.insert(command1);
-		ofstream outfile("all_files/.online.txt",ios::out|ios::app);
+		ofstream outfile(".all_files/.online.txt",ios::out|ios::app);
 		outfile<<command1<<" ";
 		outfile<<command4<<" ";
 		outfile<<command3;
 		outfile<<endl;
 
-		ofstream outfile2("all_files/.credential.txt",ios::out|ios::app);
+		ofstream outfile2(".all_files/.credential.txt",ios::out|ios::app);
 		// if(outfile2){
 		// 	cout<<"open"<<endl;
 		// }
@@ -340,12 +372,13 @@ bool UserCreate(int new_cli,string command1,string command2,string command3,stri
 		outfile2<<endl;
 		outfile.close();
 
-		string name="all_files/.files_"+command1+".txt";
+		string name=".all_files/.files_"+command1+".txt";
 		ofstream outfile3(name,ios::out);
 		outfile3.close();
+		pthread_mutex_unlock(&file_lock);
 
-		Sync("all_files/.online.txt",mysequence_i,tracker_info);
-		Sync("all_files/.credential.txt",mysequence_i,tracker_info);
+		Sync(".all_files/.online.txt",mysequence_i,tracker_info);
+		Sync(".all_files/.credential.txt",mysequence_i,tracker_info);
 		Sync(name,mysequence_i,tracker_info);
 
 		FetchDetails();
@@ -364,24 +397,28 @@ bool GroupCreate(int new_cli,string command1,string command2,struct Message* mes
 	if(groups.find(command1)==groups.end()){
 		// online.insert(command1,make_pair(to_string()));
 
-		ofstream outfile("all_files/.group.txt",ios::out|ios::app);
+		pthread_mutex_lock(&file_lock);
+
+		ofstream outfile(".all_files/.group.txt",ios::out|ios::app);
 		outfile<<command1;
 		outfile<<" ";
 		outfile<<command2;
 		outfile<<endl;
 		outfile.close();
 
-		string name="all_files/.group_"+command1+".txt";
+		string name=".all_files/.group_"+command1+".txt";
 		outfile.open(name,ios::out);
 		outfile<<command2;
 		outfile<<endl;
 		outfile.close();
 
-		string name1="all_files/.group_"+command1+"_files.txt";
+		string name1=".all_files/.group_"+command1+"_files.txt";
 		outfile.open(name1,ios::out);
 		outfile.close();
 
-		Sync("all_files/.group.txt",mysequence_i,tracker_info);
+		pthread_mutex_unlock(&file_lock);
+
+		Sync(".all_files/.group.txt",mysequence_i,tracker_info);
 		Sync(name,mysequence_i,tracker_info);
 		Sync(name1,mysequence_i,tracker_info);
 
@@ -440,8 +477,10 @@ string GroupFileList(int new_cli,struct Message* message,string command1){
 	else{
 
 		set<string> files;
-		string name="all_files/.group_"+command1+"_files.txt";
+		string name=".all_files/.group_"+command1+"_files.txt";
 		string line;
+
+		pthread_mutex_lock(&file_lock);
 
 		ifstream infile(name,ios::in);
 
@@ -449,6 +488,9 @@ string GroupFileList(int new_cli,struct Message* message,string command1){
 			auto split_vector=split(line,' ');
 			files.insert(split_vector[3]);
 		}
+
+		infile.close();
+		pthread_mutex_unlock(&file_lock);
 
 		for(auto i:files){
 			data=data+i+'\n';
@@ -473,21 +515,25 @@ bool GroupJoin(int new_cli,string command1,string command2,struct Message* messa
 	auto iter2=online.find(iter->second);
 	if(iter2==online.end()){
 		if(pending_group_requests.find(make_pair(command2,command1))==pending_group_requests.end()){
-			ofstream outfile("all_files/.pending.txt",ios::out|ios::app);
+			pthread_mutex_lock(&file_lock);
+			ofstream outfile(".all_files/.pending.txt",ios::out|ios::app);
 			outfile<<command2<<" "<<command1<<endl;
 			outfile.close();
 			pending_group_requests.insert(make_pair(command2,command1));
 
-			
+			pthread_mutex_unlock(&file_lock);
 		}
 	}
 	else{
 		auto iter3=online_users[*iter2];
 		// cout<<iter3.first<<" "<<iter3.second<<endl;
 
-		ofstream outfile("all_files/.pending.txt",ios::out|ios::app);
+		pthread_mutex_lock(&file_lock);
+
+		ofstream outfile(".all_files/.pending.txt",ios::out|ios::app);
 		outfile<<command2<<" "<<command1<<endl;
 		outfile.close();
+		pthread_mutex_unlock(&file_lock);
 		pending_group_requests.insert(make_pair(command2,command1));
 
 		// string data="join_group "+command1+" "+command2;
@@ -497,7 +543,7 @@ bool GroupJoin(int new_cli,string command1,string command2,struct Message* messa
 		// Sync(".pending.txt");
 	}
 
-	Sync("all_files/.pending.txt",mysequence_i,tracker_info);
+	Sync(".all_files/.pending.txt",mysequence_i,tracker_info);
 	return true;
 }
 
@@ -515,15 +561,20 @@ bool GroupAcceptRequest(int new_cli,string command1,string command2,string comma
 		cout<<"Already Memeber"<<endl;
 		return true;
 	}
-	string name="all_files/.group_"+command1+".txt";
+	string name=".all_files/.group_"+command1+".txt";
 	string remove_line=command2+" "+command1;
 	// cout<<name<<endl;
+
+	pthread_mutex_lock(&file_lock);
 	ofstream outfile(name,ios::out|ios::app);
 	outfile<<command2<<endl;
 	outfile.close();
-	DeleteLine("all_files/.pending.txt",remove_line);
+	pthread_mutex_unlock(&file_lock);
 
-	Sync("all_files/.pending.txt",mysequence_i,tracker_info);
+	DeleteLine(".all_files/.pending.txt",remove_line);
+
+	Sync(".all_files/.pending.txt",mysequence_i,tracker_info);
+	Sync(name,mysequence_i,tracker_info);
 
 	return true;
 }
@@ -540,7 +591,7 @@ bool GroupFileUpload(int new_cli,string command1,string command2,string command3
 	FetchGroupMembers(command3);
 	if(group_members.find(command4)==group_members.end())
 		return false;
-	string name="all_files/.group_"+command3+"_files.txt";
+	string name=".all_files/.group_"+command3+"_files.txt";
 
 	if(CheckGroupFiles(command1,name,command4))
 		return true;
@@ -552,12 +603,16 @@ bool GroupFileUpload(int new_cli,string command1,string command2,string command3
 	if(CheckIntegrity(command1,name,command5))
 		return false;
 
+	pthread_mutex_lock(&file_lock);
+
 	ofstream outfile(name,ios::out|ios::app);
 	outfile<<command1<<" "<<command2<<" "<<command4<<" "<<command5<<endl;
 	
-	string name2="all_files/.files_"+command4+".txt";
+	string name2=".all_files/.files_"+command4+".txt";
 	ofstream outfile2(name2,ios::out|ios::app);
 	outfile2<<command3<<" "<<command5<<" "<<command6<<endl;
+
+	pthread_mutex_unlock(&file_lock);
 
 	Sync(name,mysequence_i,tracker_info);
 	Sync(name2,mysequence_i,tracker_info);
@@ -581,11 +636,13 @@ bool GroupStopShare(int new_cli,string command1,string command2,string command3,
 	}
 
 	cout<<command1<<" "<<command2<<" "<<command3<<endl;
-	string name="all_files/.group_"+command1+"_files.txt";
-	string name1="all_files/.files_"+command3+".txt";
+	string name=".all_files/.group_"+command1+"_files.txt";
+	string name1=".all_files/.files_"+command3+".txt";
+
+	pthread_mutex_lock(&file_lock);
 
 	ifstream infile(name,ios::in);
-	ofstream outfile("all_files/.temp.txt",ios::out);
+	ofstream outfile(".all_files/.temp.txt",ios::out);
 	string line;
 
 	while(getline(infile,line)){
@@ -596,14 +653,14 @@ bool GroupStopShare(int new_cli,string command1,string command2,string command3,
 	}
 
 	remove(name.c_str());
-	rename("all_files/.temp.txt",name.c_str());
+	rename(".all_files/.temp.txt",name.c_str());
 	infile.close();
 	outfile.close();
 
 	// DeleteLine(name1,command2,1);
 
 	ifstream infile2(name1,ios::in);
-	ofstream outfile2("all_files/.temp.txt",ios::out);
+	ofstream outfile2(".all_files/.temp.txt",ios::out);
 
 	while(getline(infile2,line)){
 		auto split_vector=split(line,' ');
@@ -613,9 +670,11 @@ bool GroupStopShare(int new_cli,string command1,string command2,string command3,
 	}
 
 	remove(name1.c_str());
-	rename("all_files/.temp.txt",name1.c_str());
+	rename(".all_files/.temp.txt",name1.c_str());
 	infile2.close();
 	outfile2.close();
+
+	pthread_mutex_unlock(&file_lock);
 
 	Sync(name,mysequence_i,tracker_info);
 	Sync(name1,mysequence_i,tracker_info);
@@ -626,17 +685,23 @@ bool GroupStopShare(int new_cli,string command1,string command2,string command3,
 bool GroupLeave(int new_cli,string command1,string command2,struct Message* message){
 	auto iter=groups.find(command1);
 
+	cout<<command1<<" "<<command2<<endl;
+
 	if(iter==groups.end())
 		return false;
+
+	cout<<command1<<" "<<command2<<" "<<iter->second<<endl;
 
 	FetchGroupMembers(command1);
 	if(group_members.find(command2)==group_members.end() || iter->second==command2){
 		return false;
 	}
+
+	cout<<command1<<" "<<command2<<endl;
 	
-	string name1="all_files/.group_"+command1+".txt";
-	string name2="all_files/.group_"+command1+"_files.txt";
-	string name3="all_files/.files_"+command2+".txt";
+	string name1=".all_files/.group_"+command1+".txt";
+	string name2=".all_files/.group_"+command1+"_files.txt";
+	string name3=".all_files/.files_"+command2+".txt";
 
 	DeleteLine(name1,command2,0);
 	DeleteLine(name2,command2,2);
@@ -651,6 +716,95 @@ bool GroupLeave(int new_cli,string command1,string command2,struct Message* mess
 	return true;
 }
 
+string SendSHA(int new_cli,struct Message* message,string command1,string command2,string command3){
+
+	FetchDetails();
+	string data="";
+
+	auto iter=groups.find(command1);
+
+	if(iter==groups.end())
+		return data;
+	else{
+
+		set<string> files;
+		unordered_map<string,string> file_hash;
+		string name=".all_files/.group_"+command1+"_files.txt";
+		string line;
+
+		FetchGroupMembers(command1);
+		if(group_members.find(command3)==group_members.end())
+			return data;
+
+		pthread_mutex_lock(&file_lock);
+
+		ifstream infile(name,ios::in);
+
+		while(getline(infile,line)){
+			auto split_vector=split(line,' ');
+			files.insert(split_vector[3]);
+			file_hash.insert(make_pair(split_vector[3],split_vector[0]));
+		}
+
+		infile.close();
+		pthread_mutex_unlock(&file_lock);
+
+		if(files.find(command2)==files.end())
+			return data;
+
+		data=file_hash[command2];
+	}
+
+	return data;
+}
+
+string SendSeeders(int new_cli,struct Message* message,string command1,string command2,string command3){
+
+	FetchDetails();
+	string data="";
+	string size;
+
+	set<string> seeders;
+	string name=".all_files/.group_"+command1+"_files.txt";
+	string line;
+
+	pthread_mutex_lock(&file_lock);
+
+	ifstream infile(name,ios::in);
+
+	while(getline(infile,line)){
+		auto split_vector=split(line,' ');
+		
+		if(split_vector[3]==command2){
+			size=split_vector[1];
+			if(online.find(split_vector[2])!=online.end())
+				seeders.insert(split_vector[2]);
+		}
+	}
+
+	infile.close();
+	pthread_mutex_unlock(&file_lock);
+
+	for(auto i:seeders)
+		data+=i+" ";
+
+	if(data.size()>0)
+		data+=size;
+
+	return data;
+}
+
+string SendDetails(int new_cli,struct Message* message,string command1){
+	FetchDetails();
+	string data="";
+
+	auto itr=online_users[command1];
+
+	data+=itr.first+" "+itr.second;
+
+	return data;
+}
+
 bool Logout(string command1){
 
 	FetchDetails();
@@ -658,8 +812,8 @@ bool Logout(string command1){
 	if(online.find(command1)!=online.end()){
 		// online.insert(command1,make_pair(to_string()));
 
-		DeleteLine("all_files/.online.txt",command1,0);
-		Sync("all_files/.online.txt",mysequence_i,tracker_info);
+		DeleteLine(".all_files/.online.txt",command1,0);
+		Sync(".all_files/.online.txt",mysequence_i,tracker_info);
 
 		FetchDetails();
 
@@ -682,7 +836,7 @@ void *TrackerKernel(void *pointer){
 
 	data_len=recv(message->new_cli,data,MAX_SIZE,0);
 	data[data_len]='\0';
-	// cout<<data<<endl;
+	cout<<data<<endl;
 	// cout<<data_len<<endl;
 
 	string command(data);
@@ -821,6 +975,28 @@ void *TrackerKernel(void *pointer){
 		// SyncRecv(message->new_cli,command_split[1]);
 		SyncAllHandler(mysequence_i,tracker_info);
 	}
+	else if(command_split[0]=="give_sha"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+
+		string data=SendSHA(message->new_cli,message,command_split[1],command_split[2],command_split[3]);
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
+	else if(command_split[0]=="give_seeders"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+
+		string data=SendSeeders(message->new_cli,message,command_split[1],command_split[2],command_split[3]);
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
+	else if(command_split[0]=="give_details"){
+		command_object>>command_split[1];
+
+		string data=SendDetails(message->new_cli,message,command_split[1]);
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
 	else{}
 
 	close(message->new_cli);
@@ -844,7 +1020,8 @@ void *TrackerServer(void *pointer){
 
 	server.sin_family=AF_INET;
 	server.sin_port=htons(atoi((tracker_info[mysequence_i].second).c_str()));
-	server.sin_addr.s_addr=INADDR_ANY;
+	// server.sin_addr.s_addr=INADDR_ANY;
+	server.sin_addr.s_addr=inet_addr((tracker_info[mysequence_i].first).c_str());
 	bzero(&server.sin_zero,8);
 
 	if((bind(sock,(struct sockaddr*)&server,sockaddr_len))==-1){
@@ -937,6 +1114,15 @@ int main(int argc, char** argv){
 		tracker_info.push_back(make_pair(temp_ip,temp_port));
 	}
 
+	if(pthread_mutex_init(&file_lock, NULL) != 0){
+		perror("Mutex Failed");
+		exit(-1);
+	}
+	if(pthread_mutex_init(&global_lock, NULL) != 0){
+		perror("Mutex Failed");
+		exit(-1);
+	}
+
 	FetchDetails();
 	SyncAll(mysequence_i,tracker_info);
 
@@ -957,5 +1143,7 @@ int main(int argc, char** argv){
 	}
 
 	pthread_cancel(tid);
+	pthread_mutex_destroy(&file_lock);
+	pthread_mutex_destroy(&global_lock);
 	return 0;
 }
