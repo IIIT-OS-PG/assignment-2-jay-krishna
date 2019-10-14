@@ -27,19 +27,126 @@ vector<string> split(string data,char delim){
 	return v;
 }
 
-string Respond(){
-	string data="Hey";
+pair<string,int> CheckTracker(vector<pair<string,int> > tracker_data){
 
-	return data;
+	struct sockaddr_in remote_server;
+	int sock;
+	pair<string,int> server_final;
+
+	for(auto i:tracker_data){
+		// cout<<split_vector[0]<<endl;
+		// cout<<split_vector[1]<<endl;
+
+		if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+			perror("socket");
+			// exit(-1);
+		}
+
+		remote_server.sin_family=AF_INET;
+		remote_server.sin_port=htons(i.second);
+		remote_server.sin_addr.s_addr=inet_addr(i.first.c_str());
+		bzero(&remote_server.sin_zero,8);
+
+		if(!((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1)){
+			// perror("connect");
+			// exit(-1);
+			server_final=make_pair(i.first,i.second);
+			cout<<"Connected to "<<i.second<<endl;
+
+			close(sock);
+
+			return server_final;
+		}
+	}
+	return server_final;
+}
+
+string GetFilePath(pair<string,int> server_final,string groupname,string filename,string username){
+	struct sockaddr_in remote_server;
+	int sock;
+	char output[MAX_SIZE2];
+
+	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+		perror("socket");
+		exit(-1);
+	}
+
+	remote_server.sin_family=AF_INET;
+	remote_server.sin_port=htons(server_final.second);
+	remote_server.sin_addr.s_addr=inet_addr(server_final.first.c_str());
+	bzero(&remote_server.sin_zero,8);
+
+	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+		perror("connect");
+		exit(-1);
+	}
+
+	string data="send_full_path "+username+" "+groupname+" "+filename;
+	send(sock,data.c_str(),data.size(),0);
+	int len=recv(sock,output,MAX_SIZE2,0);
+	output[len]='\0';
+
+	close(sock);
+
+	string full_path(output);
+
+	cout<<"full_path is "<<full_path<<endl;
+
+	return full_path;
+}
+
+vector<pair<string,int> >Conv(vector<string> split_vector){
+	vector<pair<string,int> >tracker_data;
+	// int n=split_vector.size();
+
+	for(unsigned int k=0;k<split_vector.size();++k)
+		cout<<k<<" "<<split_vector[k]<<endl;
+
+	tracker_data.push_back(make_pair(split_vector[4],atoi(split_vector[5].c_str())));
+	tracker_data.push_back(make_pair(split_vector[6],atoi(split_vector[7].c_str())));
+
+	cout<<"tracker_data"<<endl;
+
+	for(auto i:tracker_data)
+		cout<<i.first<<" "<<i.second<<endl;
+
+	return tracker_data;
+}
+
+void TransferFunction(vector<string> split_vector,struct Message* message){
+	auto tracker_data=Conv(split_vector);
+	auto server_final=CheckTracker(tracker_data);
+	string full_path=GetFilePath(server_final,split_vector[1],split_vector[2],split_vector[8]);
+	cout<<full_path<<endl;
+	long long int pos=atoi(split_vector[3].c_str())*CHUNK_SIZE2,total=0;
+	int n;
+	// bool flag=true;
+	char data_file[SMALL_CHUNK_SIZE2];
+
+	FILE *fs=fopen(full_path.c_str(),"rb");
+	fseek(fs,pos,SEEK_SET);
+
+	total=CHUNK_SIZE2+1;
+	cout<<"Start Pos "<<pos<<"End "<<total<<endl;
+
+	while((n=fread(data_file,sizeof(char),SMALL_CHUNK_SIZE2,fs))>0&&(total>0)){
+		send(message->new_cli,data_file, n,0);
+		memset(data_file,'\0',SMALL_CHUNK_SIZE2);
+		total=total-n ;
+
+		cout<<n<<" "<<total<<endl;
+	}
+
+	cout<<"Start Pos "<<pos<<"End "<<total<<endl;	
 }
 
 void* ClientServerKernel(void* pointer){
 	int data_len;
-	char data[MAX_SIZE+1];
+	char data[MAX_SIZE2+1];
 	vector<string> command_split(10);
 	struct Message* message=(struct Message *)pointer;
 
-	data_len=recv(message->new_cli,data,MAX_SIZE,0);
+	data_len=recv(message->new_cli,data,MAX_SIZE2,0);
 	data[data_len]='\0';
 	cout<<data<<endl;
 
@@ -59,9 +166,17 @@ void* ClientServerKernel(void* pointer){
 		// command_object>>command_split[2];
 
 		cout<<command_split[1]<<endl;
-		string data=Respond();
+		string data="";
 
 		send(message->new_cli,data.c_str(),data.size(),0);
+	}
+	else if(command_split[0]=="send_chunk"){
+		cout<<command<<endl;
+
+		auto split_vector=split(command,' ');
+		TransferFunction(split_vector,message);
+
+
 	}
 	else{}
 
@@ -74,9 +189,12 @@ void* ClientServer(void* pointer){
 	int my_port_i=*((int*)pointer);
 	cout<<"here"<<endl;
 	cout<<my_port_i<<endl;
+	int counter=0;
+	int lim=100;
 	int sock;
-	int new_cli;
-	pthread_t tid;
+	int new_cli[lim];
+	pthread_t tid[lim];
+	// socklen_t len;
 
 
 	struct sockaddr_in server;
@@ -105,22 +223,25 @@ void* ClientServer(void* pointer){
 
 	while(1){
 		socklen_t len=sizeof(struct sockaddr_in);
-		if((new_cli=accept(sock,(struct sockaddr*)&client,&len))==-1){
+		if((new_cli[counter]=accept(sock,(struct sockaddr*)&client,&len))==-1){
 			perror("accept");
 			exit(-1);
 		}
 
 		Message* message=new Message;
-		message->new_cli=new_cli;
+		message->new_cli=new_cli[counter];
 		message->client=client;
 		message->client_port=to_string(ntohs(client.sin_port));
 		string temp(inet_ntoa(client.sin_addr));
 		message->client_ip=temp;
 
-		auto pid=pthread_create(&tid,NULL,ClientServerKernel,(void *)message);
+		auto pid=pthread_create(&tid[counter],NULL,ClientServerKernel,(void *)message);
 		if(pid!=0){
 			perror("thread failed");
 			exit(-1);
 		}
+
+		++counter;
+		counter=counter%lim;
 	}
 }

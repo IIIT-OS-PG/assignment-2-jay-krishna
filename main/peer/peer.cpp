@@ -26,14 +26,16 @@
 
 using namespace std;
 
-#define MAX_SIZE 1024
-#define CHUNK_SIZE 1024
+#define MAX_SIZE 65535
+#define CHUNK_SIZE 524288
 
 string username;
 string myip;
 
 string si="";//="127.0.0.1";
 int sp=0;//=10001;
+
+// unordered_map<
 
 bool CheckTracker(string filepath){
 	ifstream infile(filepath,ios::in);
@@ -377,6 +379,8 @@ pair<string,long long int> GetFileHash(string filename){
 		// printf("%s\n",result);
 		// cout<<bytes<<endl;
 		string temp_hash(result,result+20);
+
+		cout<<temp_hash.size()<<endl;
 
 		final_hash=final_hash+temp_hash;
 	}
@@ -727,7 +731,7 @@ int main(int argc, char** argv){
 			command_object>>command_split[2];
 			command_object>>command_split[3];
 
-			DownloadFile(command_split[1],command_split[2],command_split[3],username,myip,si,sp);
+			DownloadFile(command_split[1],command_split[2],command_split[3],username,myip,si,sp,filepath);
 		}
 		else if(command_split[0]=="logout"){
 			if(!login_flag){

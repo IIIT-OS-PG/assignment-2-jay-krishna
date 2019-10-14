@@ -16,18 +16,23 @@
 #include <string>
 #include <vector>
 #include <set>
+#include<math.h>
 
 using namespace std;
 
-#define MAX_SIZE 1024
+#define MAX_SIZE1 65535
+#define CHUNK_SIZE1 524288
+#define SMALL_CHUNK_SIZE1 1024
 
 // string username;
 
 #ifndef __peerdownload_H_INCLUDED__
 #define __peerdownload_H_INCLUDED__
 
-void DownloadFile(string groupname, string filename, string filepath,string username,string myip,string si,int sp);
+void DownloadFile(string groupname, string filename, string filepath,string username,string myip,string si,int sp,string serverpath);
 vector<string> split2(string data,char delim);
 void GetChunks(struct FILEDATA* filemeta);
+pair<string,int> CheckTracker2(vector<pair<string,int> > tracker_data);
+vector<pair<string,int> >Conv2(vector<string> split_vector);
 
 #endif

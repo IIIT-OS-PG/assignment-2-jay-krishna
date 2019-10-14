@@ -21,7 +21,7 @@
 
 #include "trackersync.h"
 
-#define MAX_SIZE 1024
+#define MAX_SIZE 65535
 
 using namespace std;
 
@@ -375,6 +375,15 @@ bool UserCreate(int new_cli,string command1,string command2,string command3,stri
 		string name=".all_files/.files_"+command1+".txt";
 		ofstream outfile3(name,ios::out);
 		outfile3.close();
+
+		name=".all_files/.files_"+command1+"_downloading.txt";
+		ofstream outfile4(name,ios::out);
+		outfile4.close();
+
+		name=".all_files/.files_"+command1+"_downloaded.txt";
+		ofstream outfile5(name,ios::out);
+		outfile5.close();
+
 		pthread_mutex_unlock(&file_lock);
 
 		Sync(".all_files/.online.txt",mysequence_i,tracker_info);
@@ -747,6 +756,12 @@ string SendSHA(int new_cli,struct Message* message,string command1,string comman
 		}
 
 		infile.close();
+
+		name=".all_files/.files_"+command3+"_downloading.txt";
+		ofstream outfile(name,ios::app);
+		outfile<<command1<<" "<<command2<<endl;
+		outfile.close();
+
 		pthread_mutex_unlock(&file_lock);
 
 		if(files.find(command2)==files.end())
@@ -803,6 +818,91 @@ string SendDetails(int new_cli,struct Message* message,string command1){
 	data+=itr.first+" "+itr.second;
 
 	return data;
+}
+
+string GetFullPath(int new_cli,struct Message* message,string command1,string command2,string command3){
+
+	FetchDetails();
+	string data="";
+	string size;
+
+	set<string> seeders;
+	string name=".all_files/.files_"+command1+".txt";
+	string line;
+
+	pthread_mutex_lock(&file_lock);
+
+	ifstream infile(name,ios::in);
+
+	while(getline(infile,line)){
+		auto split_vector=split(line,' ');
+		
+		if(split_vector[0]==command2 && split_vector[1]==command3){
+			data=split_vector[2];
+			break;
+		}
+	}
+
+	infile.close();
+	pthread_mutex_unlock(&file_lock);
+
+	return data;
+}
+
+void UpdateDownload(int new_cli,struct Message* message,string command1,string command2,string command3,string command4){
+
+	FetchDetails();
+	cout<<"Updating "<<endl;
+	string data="";
+	string size;
+
+	set<string> seeders;
+	string name=".all_files/.group_"+command1+"_files.txt";
+	string name2=".all_files/.files_"+command4+".txt";
+	string line;
+
+	pthread_mutex_lock(&file_lock);
+
+	ifstream infile(name,ios::in);
+
+	while(getline(infile,line)){
+		auto split_vector=split(line,' ');
+
+		cout<<line<<endl;
+		cout<<command2<<endl;
+		
+		if(split_vector[3]==command2){
+			data=split_vector[0];
+			size=split_vector[1];
+			break;
+		}
+	}
+
+	infile.close();
+
+	ifstream infile1(name2,ios::in);
+
+	while(getline(infile1,line)){
+		auto split_vector=split(line,' ');
+		
+		if(split_vector[1]==command2){
+			infile1.close();
+			pthread_mutex_unlock(&file_lock);
+			return;
+		}
+	}
+
+	infile1.close();
+
+	ofstream outfile(name2,ios::out|ios::app);
+	outfile<<command1<<" "<<command2<<" "<<command3<<endl;
+	outfile.close();
+
+	ofstream outfile1(name,ios::out|ios::app);
+	outfile1<<data<<" "<<size<<" "<<command4<<" "<<command2<<endl;
+	outfile1.close();
+
+	pthread_mutex_unlock(&file_lock);
 }
 
 bool Logout(string command1){
@@ -997,6 +1097,24 @@ void *TrackerKernel(void *pointer){
 		string data=SendDetails(message->new_cli,message,command_split[1]);
 		send(message->new_cli,data.c_str(),data.size(),0);
 	}
+	else if(command_split[0]=="send_full_path"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+
+		string data=GetFullPath(message->new_cli,message,command_split[1],command_split[2],command_split[3]);
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
+	else if(command_split[0]=="add_file"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+		command_object>>command_split[4];
+
+		// string data=GetFullPath(message->new_cli,message,command_split[1],command_split[2],command_split[3]);
+		// send(message->new_cli,data.c_str(),data.size(),0);
+		UpdateDownload(message->new_cli,message,command_split[1],command_split[2],command_split[3],command_split[4]);
+	}
 	else{}
 
 	close(message->new_cli);
@@ -1007,7 +1125,8 @@ void *TrackerServer(void *pointer){
 	int mysequence_i=*((int*) pointer);
 	struct sockaddr_in server,client;
 	int sock,new_cli;
-	pthread_t tid;
+	pthread_t tid[200];
+	int counter=0;
 
 	int sockaddr_len=sizeof(struct sockaddr_in);
 	socklen_t len=sizeof(struct sockaddr_in);
@@ -1049,11 +1168,13 @@ void *TrackerServer(void *pointer){
 		string temp(inet_ntoa(client.sin_addr));
 		message->client_ip=temp;
 
-		auto pid=pthread_create(&tid,NULL,TrackerKernel,(void *)message);
+		auto pid=pthread_create(&tid[counter],NULL,TrackerKernel,(void *)message);
 		if(pid!=0){
 			perror("thread failed");
 			exit(-1);
 		}
+		++counter;
+		counter=counter%200;
 	}
 }
 

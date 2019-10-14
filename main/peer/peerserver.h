@@ -19,9 +19,9 @@
 
 using namespace std;
 
-#define MAX_SIZE 1024
-
-// string username;
+#define MAX_SIZE2 65535
+#define CHUNK_SIZE2 524288
+#define SMALL_CHUNK_SIZE2 1024
 
 #ifndef __peerserver_H_INCLUDED__
 #define __peerserver_H_INCLUDED__
@@ -29,5 +29,9 @@ using namespace std;
 void* ClientServer(void* pointer);
 void* ClientServerKernel(void* pointer);
 vector<string> split(string data,char delim);
+pair<string,int> CheckTracker(vector<pair<string,int> > tracker_data);
+vector<pair<string,int> >Conv(vector<string> split_vector);
+string GetFilePath(pair<string,int> server_final,string groupname,string filename,string username);
+void TransferFunction(vector<string> split_vector,struct Message* message);
 
 #endif

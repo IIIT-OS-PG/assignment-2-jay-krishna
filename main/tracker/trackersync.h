@@ -21,7 +21,7 @@
 
 using namespace std;
 
-#define MAX_SIZE 1024
+#define MAX_SIZE 65535
 
 #ifndef __trackersync_H_INCLUDED__
 #define __trackersync_H_INCLUDED__
