@@ -1,5 +1,7 @@
 #include "peerdownload.h"
 
+extern unordered_map<string,vector<int>> filechunks_map;
+
 struct FILEDATA{
 	string name;
 	string path;
@@ -43,16 +45,16 @@ vector<pair<string,int> >Conv2(vector<string> split_vector){
 	vector<pair<string,int> >tracker_data;
 	// int n=split_vector.size();
 
-	for(unsigned int k=0;k<split_vector.size();++k)
-		cout<<k<<" "<<split_vector[k]<<endl;
+	// for(unsigned int k=0;k<split_vector.size();++k)
+	// 	cout<<k<<" "<<split_vector[k]<<endl;
 
 	tracker_data.push_back(make_pair(split_vector[0],atoi(split_vector[1].c_str())));
 	tracker_data.push_back(make_pair(split_vector[2],atoi(split_vector[3].c_str())));
 
-	cout<<"tracker_data"<<endl;
+	// cout<<"tracker_data"<<endl;
 
-	for(auto i:tracker_data)
-		cout<<i.first<<" "<<i.second<<endl;
+	// for(auto i:tracker_data)
+	// 	cout<<i.first<<" "<<i.second<<endl;
 
 	return tracker_data;
 }
@@ -89,6 +91,43 @@ pair<string,int> CheckTracker2(vector<pair<string,int> > tracker_data){
 		}
 	}
 	return server_final;
+}
+
+void CalcChunk(long long int nchunks,struct FILEDATA *filemeta){
+	vector <int> seeders_chunk(nchunks);
+
+	for(unsigned int i=0;i<filemeta->seeders.size();++i){
+		string conn_ip=filemeta->details[filemeta->seeders[i]].first;
+		int conn_port=atoi((filemeta->details[filemeta->seeders[i]].second).c_str());
+
+		struct sockaddr_in remote_server;
+		int sock;
+		char output[MAX_SIZE1];
+
+		if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+			perror("socket");
+			exit(-1);
+		}
+
+		remote_server.sin_family=AF_INET;
+		remote_server.sin_port=htons(conn_port);
+		remote_server.sin_addr.s_addr=inet_addr(conn_ip.c_str());
+		bzero(&remote_server.sin_zero,8);
+
+		if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+			perror("connect");
+			exit(-1);
+		}
+
+		string data="chunk_numbers "+filemeta->name;
+		send(sock,data.c_str(),data.size(),0);
+		int len=recv(sock,output,MAX_SIZE1,0);
+		output[len]='\0';
+		// cout<<i<<" "<<output<<endl;
+		// string output_string()
+	}
+
+
 }
 
 string ServerPath(string filename){
@@ -182,10 +221,15 @@ void GetFileHashsmall(string filename,int nchunks,string fullhash){
 	// final_hash=final_hash+temp_hash;
 
 	// return final_hash;
-	if(temp_hash==x)
-		cout<<"Small Chunks Matched"<<endl;
-	else
-		cout<<"Small Chunks didn't match"<<endl;
+
+
+
+
+
+	// if(temp_hash==x)
+	// 	cout<<"Small Chunks Matched"<<endl;
+	// else
+	// 	cout<<"Small Chunks didn't match"<<endl;
 }
 
 
@@ -225,8 +269,8 @@ void UpdateServer(struct ChunkData* chunkmeta){
 
 	string data="add_file "+chunkmeta->pointer->groupname+" "+chunkmeta->pointer->name+" "+chunkmeta->pointer->path+" "+chunkmeta->pointer->username;
 
-	cout<<"Sending Update"<<endl;
-	cout<<data<<endl;
+	// cout<<"Sending Update"<<endl;
+	// cout<<data<<endl;
 
 	struct sockaddr_in remote_server;
 	int sock;
@@ -320,7 +364,7 @@ void* DownloadKernel(void* pointer){
 	long long int pos=chunkmeta->chunk_num*CHUNK_SIZE1;
 	long long int file_size=CHUNK_SIZE1,n;
 
-	FILE * fs=fopen(filepath.c_str(),"r+");
+	FILE * fs=fopen(filepath.c_str(),"rb+");
 	fseek(fs,pos,SEEK_SET);
 
 	
@@ -336,18 +380,20 @@ void* DownloadKernel(void* pointer){
 
 	if(chunkmeta->chunk_num==0){
 		UpdateServer(chunkmeta);
-		cout<<"Done"<<endl;
+		// cout<<"Done"<<endl;
 	}
 
 	GetFileHashsmall(filepath,chunkmeta->chunk_num,chunkmeta->pointer->hash);
+
+	filechunks_map[chunkmeta->pointer->name].push_back(chunkmeta->chunk_num);
 
 	return NULL;
 }
 
 void GetChunks(struct FILEDATA* filemeta){
 	long long int nchunks1=atoi((filemeta->size).c_str()),x;
-	cout<<"No. of chunks are "<<nchunks1<<endl;
-	cout<<"No. of chunks are "<<CHUNK_SIZE1<<endl;
+	// cout<<"No. of chunks are "<<nchunks1<<endl;
+	// cout<<"No. of chunks are "<<CHUNK_SIZE1<<endl;
 	long long int nchunks=nchunks1/CHUNK_SIZE1;
 	if(nchunks1%CHUNK_SIZE1)
 		++nchunks;
@@ -356,6 +402,12 @@ void GetChunks(struct FILEDATA* filemeta){
 	int counter=0;
 	int nseeder=filemeta->seeders.size();
 	int ncounter=0;
+
+
+	vector<int>t;
+	filechunks_map[filemeta->name]=t;
+
+	CalcChunk(nchunks,filemeta);
 
 	for(long long int i=0;i<nchunks;++i){
 		// pthread_t tid;
@@ -372,9 +424,9 @@ void GetChunks(struct FILEDATA* filemeta){
 
 		int pid=pthread_create(&tid[counter],NULL,DownloadKernel,(void *)chunkmeta);
 		if(pid!=0){
-			// perror("thread failed");
-			// exit(-1);
-			cout<<"This has failed"<<endl;
+			perror("thread failed");
+			exit(-1);
+			// cout<<"This has failed"<<endl;
 		}
 		++counter;
 		counter=counter%200;
@@ -421,7 +473,7 @@ string GetFileHash2(string filename){
 		// cout<<bytes<<endl;
 		string temp_hash(result,result+20);
 
-		cout<<temp_hash.size()<<endl;
+		// cout<<temp_hash.size()<<endl;
 
 		final_hash=final_hash+temp_hash;
 	}
@@ -472,8 +524,8 @@ void DownloadFile(string groupname, string filename, string filepath,string user
 		cout<<"Invalid request"<<endl;
 		return;
 	}
-	else
-		cout<<output<<endl;
+	// else
+	// 	cout<<output<<endl;
 
 	close(sock);
 
@@ -511,7 +563,7 @@ void DownloadFile(string groupname, string filename, string filepath,string user
 		unordered_map<string,pair<string,string> > details;
 
 		for(auto i:split_vector){
-			cout<<i<<endl;
+			// cout<<i<<endl;
 
 			if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
 				perror("socket");
@@ -537,8 +589,8 @@ void DownloadFile(string groupname, string filename, string filepath,string user
 			details[i]=make_pair(split_vector2[0],split_vector2[1]);
 		}
 
-		for(auto j:details)
-			cout<<j.first<<" "<<j.second.first<<" "<<j.second.second<<endl;
+		// for(auto j:details)
+			// cout<<j.first<<" "<<j.second.first<<" "<<j.second.second<<endl;
 
 		filemeta->name=filename;
 		filemeta->path=filepath;
@@ -561,5 +613,12 @@ void DownloadFile(string groupname, string filename, string filepath,string user
 	UpdateServerComplete(filemeta);
 	MatchSHA(filemeta);
 	// close(sock);
+
+	for(auto ix:filechunks_map){
+		cout<<ix.first<<" ";
+		for(auto j:ix.second)
+			cout<<j<<" ";
+		cout<<endl;
+	}
 	return;
 }

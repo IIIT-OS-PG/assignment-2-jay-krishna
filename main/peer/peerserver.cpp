@@ -1,11 +1,31 @@
 #include "peerserver.h"
 
+extern unordered_map<string,vector<int>> filechunks_map;
+
 struct Message{
 	int new_cli;
 	struct sockaddr_in client;
 	string client_ip;
 	string client_port;
 };
+
+string GetChunkInfo(string filename){
+	string data="";
+	if(filechunks_map.find(filename)==filechunks_map.end())
+		return "-1";
+
+	auto itr=filechunks_map[filename];
+
+	if(itr.size()==0)
+		return "-2";
+
+	for(unsigned int i=0;i<itr.size();++i){
+		data+=to_string(itr[i])+" ";
+	}
+	data=data.substr(0,data.size()-1);
+
+	return data;
+}
 
 vector<string> split(string data,char delim){
 	vector<string> v;
@@ -90,7 +110,7 @@ string GetFilePath(pair<string,int> server_final,string groupname,string filenam
 
 	string full_path(output);
 
-	cout<<"full_path is "<<full_path<<endl;
+	// cout<<"full_path is "<<full_path<<endl;
 
 	return full_path;
 }
@@ -99,16 +119,16 @@ vector<pair<string,int> >Conv(vector<string> split_vector){
 	vector<pair<string,int> >tracker_data;
 	// int n=split_vector.size();
 
-	for(unsigned int k=0;k<split_vector.size();++k)
-		cout<<k<<" "<<split_vector[k]<<endl;
+	// for(unsigned int k=0;k<split_vector.size();++k)
+	// 	cout<<k<<" "<<split_vector[k]<<endl;
 
 	tracker_data.push_back(make_pair(split_vector[4],atoi(split_vector[5].c_str())));
 	tracker_data.push_back(make_pair(split_vector[6],atoi(split_vector[7].c_str())));
 
-	cout<<"tracker_data"<<endl;
+	// cout<<"tracker_data"<<endl;
 
-	for(auto i:tracker_data)
-		cout<<i.first<<" "<<i.second<<endl;
+	// for(auto i:tracker_data)
+	// 	cout<<i.first<<" "<<i.second<<endl;
 
 	return tracker_data;
 }
@@ -117,7 +137,7 @@ void TransferFunction(vector<string> split_vector,struct Message* message){
 	auto tracker_data=Conv(split_vector);
 	auto server_final=CheckTracker(tracker_data);
 	string full_path=GetFilePath(server_final,split_vector[1],split_vector[2],split_vector[8]);
-	cout<<full_path<<endl;
+	// cout<<full_path<<endl;
 	long long int pos=atoi(split_vector[3].c_str())*CHUNK_SIZE2,total=0;
 	int n;
 	// bool flag=true;
@@ -127,17 +147,17 @@ void TransferFunction(vector<string> split_vector,struct Message* message){
 	fseek(fs,pos,SEEK_SET);
 
 	total=CHUNK_SIZE2+1;
-	cout<<"Start Pos "<<pos<<"End "<<total<<endl;
+	// cout<<"Start Pos "<<pos<<"End "<<total<<endl;
 
 	while((n=fread(data_file,sizeof(char),SMALL_CHUNK_SIZE2,fs))>0&&(total>0)){
 		send(message->new_cli,data_file, n,0);
 		memset(data_file,'\0',SMALL_CHUNK_SIZE2);
 		total=total-n ;
 
-		cout<<n<<" "<<total<<endl;
+		// cout<<n<<" "<<total<<endl;
 	}
 
-	cout<<"Start Pos "<<pos<<"End "<<total<<endl;	
+	// cout<<"Start Pos "<<pos<<"End "<<total<<endl;	
 }
 
 void* ClientServerKernel(void* pointer){
@@ -148,7 +168,7 @@ void* ClientServerKernel(void* pointer){
 
 	data_len=recv(message->new_cli,data,MAX_SIZE2,0);
 	data[data_len]='\0';
-	cout<<data<<endl;
+	// cout<<data<<endl;
 
 	string command(data);
 	stringstream command_object(command);
@@ -158,14 +178,14 @@ void* ClientServerKernel(void* pointer){
 		command_object>>command_split[1];
 		command_object>>command_split[2];
 
-		cout<<command_split[1]<<endl;
-		cout<<command_split[2]<<endl;
+		// cout<<command_split[1]<<endl;
+		// cout<<command_split[2]<<endl;
 	}
 	else if(command_split[0]=="Hello"){
 		command_object>>command_split[1];
 		// command_object>>command_split[2];
 
-		cout<<command_split[1]<<endl;
+		// cout<<command_split[1]<<endl;
 		string data="";
 
 		send(message->new_cli,data.c_str(),data.size(),0);
@@ -178,6 +198,14 @@ void* ClientServerKernel(void* pointer){
 
 
 	}
+	else if(command_split[0]=="chunk_numbers"){
+		cout<<command<<endl;
+
+		command_object>>command_split[1];
+
+		string data=GetChunkInfo(command_split[1]);
+		send(message->new_cli,data.c_str(),data.size(),0);
+	}
 	else{}
 
 	close(message->new_cli);
@@ -187,8 +215,8 @@ void* ClientServerKernel(void* pointer){
 
 void* ClientServer(void* pointer){
 	int my_port_i=*((int*)pointer);
-	cout<<"here"<<endl;
-	cout<<my_port_i<<endl;
+	// cout<<"here"<<endl;
+	// cout<<my_port_i<<endl;
 	int counter=0;
 	int lim=100;
 	int sock;

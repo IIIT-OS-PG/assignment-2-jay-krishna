@@ -35,7 +35,7 @@ string myip;
 string si="";//="127.0.0.1";
 int sp=0;//=10001;
 
-// unordered_map<
+unordered_map<string,vector<int>> filechunks_map;
 
 bool CheckTracker(string filepath){
 	ifstream infile(filepath,ios::in);
@@ -131,7 +131,7 @@ bool UserCreate(string username,string password,int myport_i){
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -168,7 +168,7 @@ bool GroupCreate(string groupname, string username){
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -237,7 +237,7 @@ bool GroupJoin(string groupname,string username){
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -337,7 +337,7 @@ bool GroupAcceptRequest(string groupname,string username1,string username){
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -380,7 +380,7 @@ pair<string,long long int> GetFileHash(string filename){
 		// cout<<bytes<<endl;
 		string temp_hash(result,result+20);
 
-		cout<<temp_hash.size()<<endl;
+		// cout<<temp_hash.size()<<endl;
 
 		final_hash=final_hash+temp_hash;
 	}
@@ -410,12 +410,12 @@ bool FileUpload(pair<string,long long int> file_metadata,string groupname,string
 
 	string data="upload_file "+file_metadata.first+" "+to_string(file_metadata.second)+" "+groupname+" "+username+" "+filename+" "+path;
 
-	cout<<data<<" "<<data.size()<<endl;
+	// cout<<data<<" "<<data.size()<<endl;
 
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -449,7 +449,7 @@ bool GroupStopShare(string groupname,string filename,string username){
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -483,7 +483,7 @@ bool GroupLeave(string groupname,string username){
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -550,7 +550,7 @@ bool Logout(string username){
 	send(sock,data.c_str(),data.size(),0);
 	int len=recv(sock,output,MAX_SIZE,0);
 	output[len]='\0';
-	cout<<output<<endl;
+	// cout<<output<<endl;
 
 	close(sock);
 
@@ -792,9 +792,10 @@ int main(int argc, char** argv){
 				cout<<"Log in first"<<endl;
 				continue;
 			}
-			cout<<"Out"<<endl;
+			cout<<"Invalid command"<<endl;
 		}
 		// cout<<"End"<<endl;
+		cout<<endl;
 	}
 
 	return 0;

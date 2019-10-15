@@ -376,12 +376,12 @@ bool UserCreate(int new_cli,string command1,string command2,string command3,stri
 		ofstream outfile3(name,ios::out);
 		outfile3.close();
 
-		name=".all_files/.files_"+command1+"_downloading.txt";
-		ofstream outfile4(name,ios::out);
+		string name1=".all_files/.files_"+command1+"_downloading.txt";
+		ofstream outfile4(name1,ios::out);
 		outfile4.close();
 
-		name=".all_files/.files_"+command1+"_downloaded.txt";
-		ofstream outfile5(name,ios::out);
+		string name2=".all_files/.files_"+command1+"_downloaded.txt";
+		ofstream outfile5(name2,ios::out);
 		outfile5.close();
 
 		pthread_mutex_unlock(&file_lock);
@@ -389,6 +389,8 @@ bool UserCreate(int new_cli,string command1,string command2,string command3,stri
 		Sync(".all_files/.online.txt",mysequence_i,tracker_info);
 		Sync(".all_files/.credential.txt",mysequence_i,tracker_info);
 		Sync(name,mysequence_i,tracker_info);
+		Sync(name1,mysequence_i,tracker_info);
+		Sync(name2,mysequence_i,tracker_info);
 
 		FetchDetails();
 
@@ -764,6 +766,8 @@ string SendSHA(int new_cli,struct Message* message,string command1,string comman
 
 		pthread_mutex_unlock(&file_lock);
 
+		Sync(name,mysequence_i,tracker_info);
+
 		if(files.find(command2)==files.end())
 			return data;
 
@@ -904,6 +908,9 @@ void UpdateDownload(int new_cli,struct Message* message,string command1,string c
 	outfile1<<data<<" "<<size<<" "<<command4<<" "<<command2<<endl;
 	outfile1.close();
 
+	Sync(name,mysequence_i,tracker_info);
+	Sync(name2,mysequence_i,tracker_info);
+
 	// pthread_mutex_unlock(&file_lock);
 }
 
@@ -961,6 +968,9 @@ void CompleteDownload(int new_cli,struct Message* message,string command1,string
 	ofstream outfile(name,ios::out|ios::app);
 	outfile<<target<<endl;
 	outfile.close();
+
+	Sync(name,mysequence_i,tracker_info);
+	Sync(name2,mysequence_i,tracker_info);
 
 	// pthread_mutex_unlock(&file_lock);
 }
