@@ -141,12 +141,92 @@ string ServerPath(string filename){
 // 	}
 // }
 
+void GetFileHashsmall(string filename,int nchunks,string fullhash){
+	int max_limit=CHUNK_SIZE1;
+	
+	unsigned char result[2*SHA_DIGEST_LENGTH];
+	unsigned char hash[SHA_DIGEST_LENGTH];
+
+	FILE *f = fopen(filename.c_str(),"rb");
+	long long int pos=nchunks*CHUNK_SIZE1;
+	fseek(f,pos,SEEK_SET);
+
+	// if(f==NULL){
+	// 	return "";
+	// }
+
+	SHA_CTX mdContent;
+	unsigned char data[max_limit+1];
+	int bytes;
+	// long long int file_size=0;
+	// string final_hash="";
+
+	bytes=fread(data, 1, max_limit, f);
+	data[bytes]='\0';
+	// file_size+=bytes;
+
+	SHA1_Init(&mdContent);
+
+	SHA1_Update(&mdContent, data, bytes);
+	SHA1_Final(hash,&mdContent);
+	for(int i=0; i < SHA_DIGEST_LENGTH;i++){
+	  sprintf((char *)&(result[i*2]), "%02x",hash[i]);
+	}
+	// printf("%s\n",result);
+	// cout<<bytes<<endl;
+	string temp_hash(result,result+20);
+	string x=fullhash.substr(nchunks*20,20);
+
+	// cout<<temp_hash.size()<<endl;
+
+	// final_hash=final_hash+temp_hash;
+
+	// return final_hash;
+	if(temp_hash==x)
+		cout<<"Small Chunks Matched"<<endl;
+	else
+		cout<<"Small Chunks didn't match"<<endl;
+}
+
+
+// void UpdateServer(struct FILEDATA* filemeta){
+// 	auto split_vector=split2(filemeta->serverpath,' ');
+// 	auto all_trackers=Conv2(split_vector);
+// 	auto online_tracker=CheckTracker2(all_trackers);
+
+// 	string data="add_file "+filemeta->groupname+" "+filemeta->name+" "+filemeta->path+" "+filemeta->username;
+
+// 	struct sockaddr_in remote_server;
+// 	int sock;
+
+// 	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+// 		perror("socket");
+// 		exit(-1);
+// 	}
+
+// 	remote_server.sin_family=AF_INET;
+// 	remote_server.sin_port=htons(online_tracker.second);
+// 	remote_server.sin_addr.s_addr=inet_addr(online_tracker.first.c_str());
+// 	bzero(&remote_server.sin_zero,8);
+
+// 	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+// 		perror("connect");
+// 		exit(-1);
+// 	}
+
+// 	send(sock,data.c_str(),data.size(),0);
+// 	close(sock);
+// }
+
 void UpdateServer(struct ChunkData* chunkmeta){
 	auto split_vector=split2(chunkmeta->pointer->serverpath,' ');
 	auto all_trackers=Conv2(split_vector);
 	auto online_tracker=CheckTracker2(all_trackers);
 
 	string data="add_file "+chunkmeta->pointer->groupname+" "+chunkmeta->pointer->name+" "+chunkmeta->pointer->path+" "+chunkmeta->pointer->username;
+
+	cout<<"Sending Update"<<endl;
+	cout<<data<<endl;
 
 	struct sockaddr_in remote_server;
 	int sock;
@@ -259,6 +339,8 @@ void* DownloadKernel(void* pointer){
 		cout<<"Done"<<endl;
 	}
 
+	GetFileHashsmall(filepath,chunkmeta->chunk_num,chunkmeta->pointer->hash);
+
 	return NULL;
 }
 
@@ -272,13 +354,16 @@ void GetChunks(struct FILEDATA* filemeta){
 	cout<<"No. of chunks are "<<nchunks<<endl;
 	pthread_t tid[200];
 	int counter=0;
+	int nseeder=filemeta->seeders.size();
+	int ncounter=0;
 
 	for(long long int i=0;i<nchunks;++i){
 		// pthread_t tid;
 
-		if(i%2)
-			x=1;
-		else x=0;
+		// if(i%2)
+		// 	x=1;
+		// else x=0;
+		x=ncounter;
 
 		struct ChunkData* chunkmeta=new ChunkData;
 		chunkmeta->pointer=filemeta;
@@ -292,13 +377,66 @@ void GetChunks(struct FILEDATA* filemeta){
 			cout<<"This has failed"<<endl;
 		}
 		++counter;
+		counter=counter%200;
+		++ncounter;
+		ncounter=ncounter%nseeder;
 	}
 
 	for(long long int i=0;i<counter;++i){
 		pthread_join(tid[i],NULL);
 	}
 
-	UpdateServerComplete(filemeta);
+}
+
+string GetFileHash2(string filename){
+	int max_limit=CHUNK_SIZE1;
+	
+	unsigned char result[2*SHA_DIGEST_LENGTH];
+	unsigned char hash[SHA_DIGEST_LENGTH];
+
+	FILE *f = fopen(filename.c_str(),"rb");
+
+	if(f==NULL){
+		return "";
+	}
+
+	SHA_CTX mdContent;
+	unsigned char data[max_limit+1];
+	int bytes;
+	// long long int file_size=0;
+	string final_hash="";
+
+	while((bytes=fread(data, 1, max_limit, f))){
+		data[bytes]='\0';
+		// file_size+=bytes;
+
+		SHA1_Init(&mdContent);
+
+		SHA1_Update(&mdContent, data, bytes);
+		SHA1_Final(hash,&mdContent);
+		for(int i=0; i < SHA_DIGEST_LENGTH;i++){
+		  sprintf((char *)&(result[i*2]), "%02x",hash[i]);
+		}
+		// printf("%s\n",result);
+		// cout<<bytes<<endl;
+		string temp_hash(result,result+20);
+
+		cout<<temp_hash.size()<<endl;
+
+		final_hash=final_hash+temp_hash;
+	}
+
+	return final_hash;
+}
+
+void MatchSHA(struct FILEDATA *filemeta){
+	string filepath=filemeta->path;
+	string x=GetFileHash2(filepath);
+
+	if(x==filemeta->hash)
+		cout<<"Matched"<<endl;
+	else
+		cout<<"Not Matched"<<endl;
 
 }
 
@@ -419,7 +557,9 @@ void DownloadFile(string groupname, string filename, string filepath,string user
 	}
 
 	GetChunks(filemeta);
-
+	// UpdateServer(filemeta);
+	UpdateServerComplete(filemeta);
+	MatchSHA(filemeta);
 	// close(sock);
 	return;
 }

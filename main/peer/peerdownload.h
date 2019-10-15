@@ -18,6 +18,8 @@
 #include <set>
 #include<math.h>
 
+#include <openssl/sha.h>
+
 using namespace std;
 
 #define MAX_SIZE1 65535

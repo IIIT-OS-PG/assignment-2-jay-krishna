@@ -493,6 +493,38 @@ bool GroupLeave(string groupname,string username){
 		return true;
 }
 
+void ShowDownloads(string username){
+	struct sockaddr_in remote_server;
+	int sock;
+	char output[MAX_SIZE];
+
+	if((sock=socket(AF_INET,SOCK_STREAM,0))==-1){
+		perror("socket");
+		exit(-1);
+	}
+
+	remote_server.sin_family=AF_INET;
+	remote_server.sin_port=htons(sp);
+	remote_server.sin_addr.s_addr=inet_addr(si.c_str());
+	bzero(&remote_server.sin_zero,8);
+
+	if((connect(sock,(struct sockaddr*)&remote_server,sizeof(struct sockaddr_in)))==-1){
+		perror("connect");
+		exit(-1);
+	}
+
+	string data="show_downloads "+username;
+	send(sock,data.c_str(),data.size(),0);
+	int len=recv(sock,output,MAX_SIZE,0);
+	output[len]='\0';
+	cout<<"##### List of Groups #####"<<endl<<endl;
+	cout<<output<<endl;
+
+	cout<<"#####  #####"<<endl;
+
+	close(sock);
+}
+
 bool Logout(string username){
 
 	struct sockaddr_in remote_server;
@@ -732,6 +764,14 @@ int main(int argc, char** argv){
 			command_object>>command_split[3];
 
 			DownloadFile(command_split[1],command_split[2],command_split[3],username,myip,si,sp,filepath);
+		}
+		else if(command_split[0]=="show_downloads"){
+			if(!login_flag){
+				cout<<"Log in first"<<endl;
+				continue;
+			}
+
+			ShowDownloads(username);
 		}
 		else if(command_split[0]=="logout"){
 			if(!login_flag){

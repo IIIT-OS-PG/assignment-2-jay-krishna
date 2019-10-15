@@ -822,7 +822,7 @@ string SendDetails(int new_cli,struct Message* message,string command1){
 
 string GetFullPath(int new_cli,struct Message* message,string command1,string command2,string command3){
 
-	FetchDetails();
+	// FetchDetails();
 	string data="";
 	string size;
 
@@ -830,7 +830,7 @@ string GetFullPath(int new_cli,struct Message* message,string command1,string co
 	string name=".all_files/.files_"+command1+".txt";
 	string line;
 
-	pthread_mutex_lock(&file_lock);
+	// pthread_mutex_lock(&file_lock);
 
 	ifstream infile(name,ios::in);
 
@@ -844,7 +844,7 @@ string GetFullPath(int new_cli,struct Message* message,string command1,string co
 	}
 
 	infile.close();
-	pthread_mutex_unlock(&file_lock);
+	// pthread_mutex_unlock(&file_lock);
 
 	return data;
 }
@@ -861,7 +861,9 @@ void UpdateDownload(int new_cli,struct Message* message,string command1,string c
 	string name2=".all_files/.files_"+command4+".txt";
 	string line;
 
-	pthread_mutex_lock(&file_lock);
+	cout<<name<<" "<<name2<<endl;
+
+	// pthread_mutex_lock(&file_lock);
 
 	ifstream infile(name,ios::in);
 
@@ -902,7 +904,65 @@ void UpdateDownload(int new_cli,struct Message* message,string command1,string c
 	outfile1<<data<<" "<<size<<" "<<command4<<" "<<command2<<endl;
 	outfile1.close();
 
+	// pthread_mutex_unlock(&file_lock);
+}
+
+string ShowDownloads(int new_cli,struct Message* message,string command1){
+
+	FetchDetails();
+	string data="";
+	
+	string name=".all_files/.files_"+command1+"_downloading.txt";
+	string name1=".all_files/.files_"+command1+"_downloaded.txt";
+	string line;
+
+	pthread_mutex_lock(&file_lock);
+
+	ifstream infile(name,ios::in);
+
+	while(getline(infile,line)){
+		data+="[D] "+line+'\n';
+	}
+
+	infile.close();
+
+	ifstream infile1(name1,ios::in);
+
+	while(getline(infile1,line)){
+		data+="[C] "+line+'\n';
+	}
+
+	infile1.close();
+
 	pthread_mutex_unlock(&file_lock);
+
+	return data;
+}
+
+void CompleteDownload(int new_cli,struct Message* message,string command1,string command2,string command3,string command4){
+
+	FetchDetails();
+	cout<<"Completing "<<endl;
+	string data="";
+	string size;
+
+	set<string> seeders;
+	string name=".all_files/.files_"+command4+"_downloaded.txt";
+	string name2=".all_files/.files_"+command4+"_downloading.txt";
+	string target=command1+" "+command2;
+	string line;
+
+	cout<<"Target "<<name2<<" "<<target<<endl;
+
+	DeleteLine(name2,target);
+
+	// pthread_mutex_lock(&file_lock);
+
+	ofstream outfile(name,ios::out|ios::app);
+	outfile<<target<<endl;
+	outfile.close();
+
+	// pthread_mutex_unlock(&file_lock);
 }
 
 bool Logout(string command1){
@@ -1111,9 +1171,28 @@ void *TrackerKernel(void *pointer){
 		command_object>>command_split[3];
 		command_object>>command_split[4];
 
+		cout<<"add_file"<<endl;
+		cout<<command<<endl;
+
 		// string data=GetFullPath(message->new_cli,message,command_split[1],command_split[2],command_split[3]);
 		// send(message->new_cli,data.c_str(),data.size(),0);
 		UpdateDownload(message->new_cli,message,command_split[1],command_split[2],command_split[3],command_split[4]);
+	}
+	else if(command_split[0]=="complete"){
+		command_object>>command_split[1];
+		command_object>>command_split[2];
+		command_object>>command_split[3];
+		command_object>>command_split[4];
+
+		// string data=GetFullPath(message->new_cli,message,command_split[1],command_split[2],command_split[3]);
+		// send(message->new_cli,data.c_str(),data.size(),0);
+		CompleteDownload(message->new_cli,message,command_split[1],command_split[2],command_split[3],command_split[4]);
+	}
+	else if(command_split[0]=="show_downloads"){
+		command_object>>command_split[1];
+
+		string data=ShowDownloads(message->new_cli,message,command_split[1]);
+		send(message->new_cli,data.c_str(),data.size(),0);
 	}
 	else{}
 
