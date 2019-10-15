@@ -1,4 +1,0 @@
-http://www.securitytube.net/video/23
-https://www.cs.rpi.edu/~moorthy/Courses/os98/Pgms/socket.html
-https://www.youtube.com/playlist?list=PLZo2FfoMkJeEogzRXEJeTb3xpA2RAzwCZ
-https://simpledevcode.wordpress.com/2016/06/16/client-server-chat-in-c-using-sockets/
