@@ -138,11 +138,21 @@ void print(std::vector<int> v){
 	cout<<endl;
 }
 
-pair<bool,vector<int> > CalcChunk(long long int nchunks,struct FILEDATA *filemeta){
+void Select(vector<vector<int> >chunks,vector<int>&chunks_sel){
+	srand(time(0));
+	for(unsigned int i=0;i<chunks.size();++i){
+		int j=chunks[i].size();
+		int k=rand()%j;
+		chunks_sel[i]=chunks[i][k];
+	}
+}
+
+vector<int> CalcChunk(long long int nchunks,struct FILEDATA *filemeta){
 	vector <int> seeders_chunk(nchunks,-1);
-	vector<vector<int> > matrix(filemeta->seeders.size(),vector<int> (nchunks+1,-1));
-	vector<pair<int,vector<int> > > v;
-	bool flag=false;
+	vector<vector<int> > chunks_matrix(nchunks);
+	// vector<vector<int> > matrix(filemeta->seeders.size(),vector<int> (nchunks+1,-1));
+	// vector<pair<int,vector<int> > > v;
+	// bool flag=false;
 
 	for(unsigned int i=0;i<filemeta->seeders.size();++i){
 		string conn_ip=filemeta->details[filemeta->seeders[i]].first;
@@ -173,35 +183,39 @@ pair<bool,vector<int> > CalcChunk(long long int nchunks,struct FILEDATA *filemet
 		output[len]='\0';
 		// cout<<i<<" "<<output<<endl;
 		string output_string(output);
-		std::vector<int> temp;
+		// std::vector<int> temp;
 
 		if(output_string=="-1"){
-			for(int i=0;i<nchunks;++i)
-				temp.push_back(i+1);
+			for(int j=0;j<nchunks;++j)
+				// temp.push_back(i+1);
+				chunks_matrix[j].push_back(i);
 
-			v.push_back(make_pair(i,temp));
+			// v.push_back(make_pair(i,temp));
 		}
 		else if(output_string=="-2"){
-			v.push_back(make_pair(i,temp));
-			flag=true;
+			// v.push_back(make_pair(i,temp));
+			// flag=true;
 		}
 		else{
 			auto split_vector=split2(output_string,' ');
 			for(auto x:split_vector)
-				temp.push_back(atoi(x.c_str())+1);
+				chunks_matrix[atoi(x.c_str())].push_back(i);
+				// temp.push_back(atoi(x.c_str())+1);
 
-			v.push_back(make_pair(i,temp));
-			flag=true;
+			// v.push_back(make_pair(i,temp));
+			// flag=true;
 		}
 	}
-	sort(v.begin(),v.end(),my_comp);
-	populate(matrix,v);
-	Decide(matrix,seeders_chunk);
+	// sort(v.begin(),v.end(),my_comp);
+	// populate(matrix,v);
+	// Decide(matrix,seeders_chunk);
 	// print(seeders_chunk);
 
-	auto ret=make_pair(flag,seeders_chunk);
+	// auto ret=make_pair(flag,seeders_chunk);
+	Select(chunks_matrix,seeders_chunk);
+	print(seeders_chunk);
 
-	return ret;
+	return seeders_chunk;
 
 }
 
@@ -459,8 +473,8 @@ point:
 		// cout<<"Done"<<endl;
 	}
 
-	if(!GetFileHashsmall(filepath,chunkmeta->chunk_num,chunkmeta->pointer->hash))
-		goto point;
+	// if(!GetFileHashsmall(filepath,chunkmeta->chunk_num,chunkmeta->pointer->hash))
+	// 	goto point;
 
 	filechunks_map[chunkmeta->pointer->name].push_back(chunkmeta->chunk_num);
 
@@ -477,8 +491,8 @@ void GetChunks(struct FILEDATA* filemeta){
 	// cout<<"No. of chunks are "<<nchunks<<endl;
 	pthread_t tid[1000];
 	int counter=0;
-	int nseeder=filemeta->seeders.size();
-	int ncounter=0;
+	// int nseeder=filemeta->seeders.size();
+	// int ncounter=0;
 
 
 	vector<int>t;
@@ -492,14 +506,16 @@ void GetChunks(struct FILEDATA* filemeta){
 		// if(i%2)
 		// 	x=1;
 		// else x=0;
-		if(!decide.first){
-			x=ncounter;
-			++ncounter;
-			ncounter=ncounter%nseeder;
-		}
-		else{
-			x=decide.second[i];
-		}
+		// if(!decide.first){
+		// 	x=ncounter;
+		// 	++ncounter;
+		// 	ncounter=ncounter%nseeder;
+		// }
+		// else{
+		// 	x=decide.second[i];
+		// }
+
+		x=decide[i];
 
 		struct ChunkData* chunkmeta=new ChunkData;
 		chunkmeta->pointer=filemeta;
